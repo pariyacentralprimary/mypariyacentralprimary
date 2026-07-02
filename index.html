@@ -3603,8 +3603,8 @@ const SCHOOL_CONFIG = {
   name:             "PARIYA CENTRAL PRIMARY",
   motto:            "Do not be sad",
   address:          "Opposite Govt Junior Secondary School",
-  primaryWebsite:   "https://mypariyaaprimary.netlify.app",
-  secondaryWebsite: "https://mypariyaaprimary.netlify.app",
+  primaryWebsite:   "https://mypariyacentralprimary.netlify.app",
+  secondaryWebsite: "https://mypariyacentralprimary.netlify.app",
 
   // ── Contact info shown in the report card header (leave blank to hide) ──
   email:       "",
@@ -3714,7 +3714,7 @@ const WEBSITES_CSV_URL = ""; // Optional: paste CSV link here to load from sheet
 const SCHOOL_WEBSITES = [
   // Add website entries here if not using a CSV:
   // { function: "School Portal", url: "https://example.com", username: "admin", password: "pass123" },
-  { function: "Primary Student Portal", url: "https://mypariyaaprimary.netlify.app", username: "admin", password: "admin2026" },
+  { function: "Primary Student Portal", url: "https://mypariyacentralprimary.netlify.app", username: "admin", password: "admin2026" },
 ];
 /* END CUSTOM EDIT SECTION — School Websites Config */
 
@@ -4994,7 +4994,7 @@ function renderCards(container, rawStudents, formMasterOverride) {
       const contactParts = [];
       if (SCHOOL_CONFIG.email) contactParts.push(`<span>✉ ${escapeHtml(SCHOOL_CONFIG.email)}</span>`);
       if (SCHOOL_CONFIG.phone) contactParts.push(`<span>☎ ${escapeHtml(SCHOOL_CONFIG.phone)}</span>`);
-      if (website) contactParts.push(`<span>🌐 <a href="${website}" target="_blank" style="color:inherit;text-decoration:none;">${escapeHtml(website)}</a></span>`);
+      if (website) contactParts.push(`<span>Website: <a href="${website}" target="_blank" style="color:inherit;text-decoration:none;">${escapeHtml(website)}</a></span>`);
       const contactHtml = contactParts.length ? `<div class="rc-contact">${contactParts.join('')}</div>` : '';
 
       /* ─── Student photo (falls back to a placeholder silhouette) ─── */
