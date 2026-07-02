@@ -578,7 +578,13 @@ body {
      --rc-red    : Final remarks / signature box border
    ============================================================ */
 :root {
-  --rc-navy:   var(--primary);
+  /* NOTE: these are intentionally FLAT literal values (not var(--primary))
+     because chained custom properties (a variable whose value is another
+     variable) are unreliable in html2canvas/html2pdf's PDF export and in
+     some print engines — they can silently fail to resolve. --rc-navy is
+     kept in sync with the school's brand colour (--primary: #5C3317) by
+     value, not by reference. */
+  --rc-navy:   #5C3317;
   --rc-green:  #1F7A3D;
   --rc-green-bg: #E9F6EE;
   --rc-blue:   #1E4FA0;
@@ -632,7 +638,7 @@ body {
 
 /* ── Bordered info box with student bio-data fields ────────── */
 .rc-infobox { border:1.5px solid var(--rc-navy); border-radius:10px; padding:8px 12px; margin-bottom:10px; }
-.rc-info-row { display:flex; flex-wrap:wrap; gap:4px 14px; padding:3px 0; font-size:11px; font-weight:800; }
+.rc-info-row { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 14px; padding:3px 0; font-size:11px; font-weight:800; }
 .rc-info-row + .rc-info-row { border-top:1px dashed rgba(61,35,20,0.18); }
 .rc-field { display:inline-flex; align-items:baseline; gap:4px; white-space:nowrap; }
 .rc-field .rc-label { color:var(--rc-navy); font-weight:900; }
@@ -1052,17 +1058,26 @@ body {
   .card {
     margin:0 !important; padding:6mm !important;
     page-break-after:always !important;
-    page-break-inside:avoid !important;
-    height:280mm !important;
+    page-break-inside:auto !important;
+    /* NOTE: a fixed height (was 280mm) overflowed real report cards —
+       schools with 11-13+ subjects plus the Domains/Keys/QR row and
+       remarks box run taller than a single fixed A4 height, which was
+       corrupting the printed/PDF output. Let each card size itself to
+       its own content instead, and let the browser paginate naturally. */
+    min-height:auto !important; height:auto !important;
     border:2.5px solid var(--border) !important;
     outline:2.5px solid var(--border) !important;
     position:relative;
-    transform:scale(0.97); transform-origin:top center;
     background:#fff !important; color:#2A1810 !important;
     box-sizing:border-box !important;
   }
   .card:last-child { page-break-after:avoid !important; }
   .card-dl-btn, .qr-wrap > button { display:none !important; }
+
+  /* If a card's content is long enough to need a 2nd page, keep each
+     self-contained block from being split awkwardly across the break */
+  .rc-header, .rc-infobox, .rc-perf-banner, .annual-summary-box,
+  .rc-triple-row, .rc-remarks-box { page-break-inside:avoid !important; }
 
   /* Preserve subject table borders */
   .card-subjects table { border-collapse:collapse !important; }
@@ -3249,6 +3264,7 @@ canvas.pa-chart {
           <!-- Toolbar with search and generate button -->
           <div class="class-detail-toolbar">
             <input type="text" class="class-search-input" id="detail-search" placeholder="🔍 Search student by name or admission…" oninput="filterDetailTable()">
+            <input type="text" class="class-search-input" id="detail-formmaster" placeholder="✍️ Form Master name (optional — leave blank to use default)" style="max-width:280px;">
             <button class="btn-gen-all" onclick="generateFromDetail()">📋 Generate All Results</button>
           </div>
 
@@ -3629,7 +3645,7 @@ const SCHOOL_CONFIG = {
   closingDate: "",
 
   // ── Primary authority ──
-  headmasterName: "Mal. Hddabi Bayahya",
+  headmasterName: "Mal. Babajo Umar",
   headmasterSig:  "https://i.postimg.cc/mgHMhv5f/20251204-232335.jpg",
 
   // ── Form Masters ──
@@ -4423,7 +4439,11 @@ function generateFromDetail() {
 
       const area = $('reportArea');
       area.innerHTML = '';
-      renderCards(area, students);
+      // Use the manually-typed Form Master name if the admin filled it in,
+      // otherwise renderCards() falls back to SCHOOL_CONFIG.primaryFormMasterName.
+      const fmInput = $('detail-formmaster');
+      const formMasterOverride = fmInput ? fmInput.value.trim() : '';
+      renderCards(area, students, formMasterOverride);
       $('reportWrapper').scrollIntoView({ behavior: 'smooth' });
       showToast(`✅ ${students.length} cards generated for ${currentClass} (${currentTerm})`);
     })
@@ -4763,7 +4783,7 @@ const RC_DEFAULT_PHOTO_SVG = `<svg viewBox="0 0 64 64" width="100%" height="100%
   <path d="M10 58c0-14 10-22 22-22s22 8 22 22" fill="#A98A6D"/>
 </svg>`;
 
-function renderCards(container, rawStudents) {
+function renderCards(container, rawStudents, formMasterOverride) {
   container.innerHTML = '';
 
   // Detect subjects from column headers (e.g. "Mathematics_CA1" → "Mathematics")
@@ -4896,7 +4916,7 @@ function renderCards(container, rawStudents) {
       const authorityName    = SCHOOL_CONFIG.headmasterName;
       const authoritySig     = SCHOOL_CONFIG.headmasterSig;
       const authorityTitle   = 'Headmaster';
-      const formMasterName   = SCHOOL_CONFIG.primaryFormMasterName;
+      const formMasterName   = (formMasterOverride && formMasterOverride.trim()) ? formMasterOverride.trim() : SCHOOL_CONFIG.primaryFormMasterName;
       const formMasterSig    = SCHOOL_CONFIG.primaryFormMasterSig;
       const website          = SCHOOL_CONFIG.primaryWebsite;
 
@@ -5176,7 +5196,7 @@ function renderCards(container, rawStudents) {
 
     const verifyUrl      = SCHOOL_CONFIG.primaryWebsite;
     const authorityName  = SCHOOL_CONFIG.headmasterName;
-    const fmName         = SCHOOL_CONFIG.primaryFormMasterName;
+    const fmName         = (formMasterOverride && formMasterOverride.trim()) ? formMasterOverride.trim() : SCHOOL_CONFIG.primaryFormMasterName;
 
     const qrText =
       `SCHOOL: ${SCHOOL_CONFIG.name}\n` +
@@ -5276,7 +5296,14 @@ function downloadSingleCard(buttonEl) {
     html2canvas: {
       scale:           2,
       useCORS:         true,
-      allowTaint:      true,
+      /* NOTE: allowTaint was removed on purpose. allowTaint:true lets
+         cross-origin images (e.g. the school logo / signature images)
+         draw onto the canvas even without proper CORS headers — but that
+         "taints" the canvas, and reading a tainted canvas (which is what
+         html2pdf does internally to build the PDF) throws a
+         SecurityError that silently killed the whole download with no
+         visible error. useCORS alone will just skip an image that fails
+         CORS instead of crashing the export. */
       logging:         false,
       backgroundColor: '#ffffff',
       scrollX:         0,
@@ -5285,8 +5312,13 @@ function downloadSingleCard(buttonEl) {
     jsPDF: { unit:'mm', format:'a4', orientation:'portrait' }
   };
   return html2pdf().set(opt).from(card).save()
-    .then(() => {
-      // Restore
+    .catch(err => {
+      console.error('downloadSingleCard failed:', err);
+      showToast('❌ Could not download this card. See console for details.', 'error');
+    })
+    .finally(() => {
+      // Always restore — even if the export above failed — so the card
+      // never gets stuck with a hidden download button or baked colours.
       buttonEl.style.visibility = 'visible';
       unbakeComputedColors(card);
     });
@@ -5340,14 +5372,28 @@ async function downloadReportsIndividually() {
   const cards = document.querySelectorAll('#reportArea .card');
   if (!cards.length) { showToast('❌ No report cards found.', 'error'); return; }
   showToast(`⏳ Downloading ${cards.length} cards…`);
+  let succeeded = 0, failed = 0;
   for (let i = 0; i < cards.length; i++) {
     const tempBtn = document.createElement('button');
     cards[i].appendChild(tempBtn);
-    await downloadSingleCard(tempBtn);
+    try {
+      await downloadSingleCard(tempBtn);
+      succeeded++;
+    } catch (err) {
+      // downloadSingleCard already catches its own errors internally, but
+      // this guards against anything unexpected so ONE failing card can
+      // never silently stop the rest of the batch from downloading.
+      console.error(`Card ${i + 1} failed to download:`, err);
+      failed++;
+    }
     tempBtn.remove();
     await new Promise(r => setTimeout(r, 400));
   }
-  showToast('✅ All cards downloaded!');
+  if (failed) {
+    showToast(`⚠️ ${succeeded} downloaded, ${failed} failed. Check console for details.`, 'error');
+  } else {
+    showToast('✅ All cards downloaded!');
+  }
 }
 
 /* ============================================================
@@ -5358,40 +5404,40 @@ function safePrint() {
   if (!reportCards.length) { showToast('❌ No report cards to print.', 'error'); return; }
   showToast('⏳ Preparing print view…');
 
-  const pc = $('printContainer');
-  pc.innerHTML = '';
+  try {
+    const pc = $('printContainer');
+    pc.innerHTML = '';
 
-  reportCards.forEach(card => {
-    const clone = card.cloneNode(true);
+    reportCards.forEach(card => {
+      const clone = card.cloneNode(true);
 
-    // Remove interactive buttons (download / QR-verify label stays)
-    clone.querySelectorAll('button').forEach(b => b.remove());
+      // Remove interactive buttons (download / QR-verify label stays)
+      clone.querySelectorAll('button').forEach(b => b.remove());
 
-    // Carry the computed CSS colour variables into the clone as inline style
-    // so print rendering sees the same colours as the screen view.
-    const computed = window.getComputedStyle(card);
-    const cssVars = [
-      '--primary','--soft','--accent','--muted','--border',
-      '--rc-navy','--rc-green','--rc-green-bg','--rc-blue','--rc-blue-bg',
-      '--rc-orange','--rc-orange-bg','--rc-purple','--rc-purple-bg','--rc-red'
-    ];
-    const inlineVars = cssVars
-      .map(v => `${v}:${computed.getPropertyValue(v).trim()}`)
-      .join(';');
+      // Attach the clone to the document FIRST — getComputedStyle only
+      // resolves real values (CSS vars, cascade, inheritance) once an
+      // element is actually connected to the document. Baking colours
+      // on a still-detached clone silently does nothing useful.
+      pc.appendChild(clone);
 
-    // Only add inline vars if not already present (prevents duplicating)
-    const existingStyle = clone.getAttribute('style') || '';
-    clone.setAttribute('style', existingStyle + ';' + inlineVars);
+      // Bake real computed colours into the clone as inline styles, as an
+      // extra safety net in case a browser's print engine doesn't fully
+      // resolve CSS custom properties on cloned nodes.
+      bakeComputedColors(clone);
+    });
 
-    // Ensure every colour zone in the clone also carries explicit, baked-in
-    // colours (some browsers strip CSS vars from clones in print context)
-    bakeComputedColors(clone);
-
-    pc.appendChild(clone);
-  });
-
-  // Give browser time to layout before printing
-  setTimeout(() => window.print(), 2000);
+    // Give browser time to layout before printing
+    setTimeout(() => {
+      try { window.print(); }
+      catch (err) {
+        console.error('window.print() failed:', err);
+        showToast('❌ Could not open the print dialog.', 'error');
+      }
+    }, 500);
+  } catch (err) {
+    console.error('safePrint failed:', err);
+    showToast('❌ Could not prepare the print view. See console for details.', 'error');
+  }
 }
 
 /* ============================================================
