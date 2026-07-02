@@ -194,7 +194,7 @@
   to   { opacity:1; transform:translateY(0); }
 }
 .tab-panel.active { animation: fadeInUp 0.28s ease; }
-.stat-card, .class-card, .section-big-card {
+.class-card, .section-big-card {
   animation: fadeInUp 0.3s ease both;
 }
 
@@ -331,7 +331,6 @@
 
 @media (max-width: 600px) {
   .dash-nav-brand span { display: none; }
-  .stats-row { grid-template-columns: repeat(2,1fr); }
   .class-grid { grid-template-columns: 1fr; }
   .sidebar { width: 85vw; max-width: 300px; }
 }
@@ -489,9 +488,6 @@ body {
 .dash-main { flex: 1; padding: 20px 16px 16px; overflow-y: auto; }
 
 /* Stats */
-.stats-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 22px; }
-.stat-card { background: var(--dash-card); border: 1px solid var(--dash-border); border-radius: var(--radius); padding: 14px 12px; }
-.stat-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dash-muted); }
 .stat-value { font-size: 20px; font-weight: 900; color: var(--dash-accent); line-height: 1.1; margin: 3px 0; }
 .stat-sub   { font-size: 10px; color: var(--dash-muted); font-weight: 600; }
 
@@ -1054,6 +1050,7 @@ body {
   * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important; }
   body > * { display:none !important; }
   body > #printContainer { display:block !important; }
+  body > #tt-print-mount  { display:block !important; }
 
   .card {
     margin:0 !important; padding:6mm !important;
@@ -1318,11 +1315,6 @@ body {
 }
 .badge-primary { background: var(--ad-emerald-lt); color: #3E4F2A; }
 
-/* Stats row — keep old IDs working */
-.stats-row { display: none; } /* replaced by ad-hero-grid */
-
-/* Old dash-tabs replaced by ad-tab-bar */
-.dash-tabs { display: none; }
 /* Re-show tab-panels */
 .tab-panel { display: none; }
 .tab-panel.active { display: block; animation: fadeInUp .24s ease; }
@@ -1435,17 +1427,6 @@ body {
 }
 .btn-back-dash:hover { border-color: var(--dash-green); color: var(--dash-accent); }
 
-/* Progress Tracker */
-.progress-tracker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-.progress-card {
-  background: var(--dash-card); border: 1px solid var(--dash-border);
-  border-radius: var(--radius); padding: 14px;
-}
-.progress-card-title { font-size: 11px; font-weight: 800; color: var(--dash-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
-.progress-bar-wrap { background: var(--dash-border); border-radius: 999px; height: 8px; overflow: hidden; margin-bottom: 6px; }
-.progress-bar-fill { height: 100%; border-radius: 999px; background: var(--dash-green); transition: width 0.5s ease; }
-.progress-pct { font-size: 20px; font-weight: 900; color: var(--dash-accent); }
-.progress-detail { font-size: 11px; color: var(--dash-muted); font-weight: 600; margin-top: 4px; }
 
 /* Analytics */
 .analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
@@ -1516,8 +1497,6 @@ body {
 
 /* Responsive adjustments */
 @media (max-width: 480px) {
-  .stats-row { grid-template-columns: repeat(2, 1fr); }
-  .progress-tracker-grid { grid-template-columns: 1fr; }
   .analytics-grid { grid-template-columns: 1fr; }
   .term-btn-row { flex-direction: column; }
   .dash-tabs { gap: 4px; }
@@ -2278,11 +2257,6 @@ canvas.pa-chart {
 .tt-empty-state { text-align:center; padding:40px 20px; color: var(--ad-ink3); }
 .tt-empty-state i { font-size:36px; margin-bottom:12px; opacity:.5; display:block; }
 
-@media print {
-  body * { visibility:hidden; }
-  #tt-print-mount, #tt-print-mount * { visibility:visible; }
-  #tt-print-mount { position:absolute; top:0; left:0; width:100%; }
-}
 </style>
 </head>
 <body>
@@ -5212,12 +5186,20 @@ function renderCards(container, rawStudents, formMasterOverride) {
       `VERIFY: ${verifyUrl}`;
 
     qrContainer.innerHTML = '';
-    new QRCode(qrContainer, {
-      text: qrText,
-      width: 100, height: 100,
-      colorDark: '#1A0F08', colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
-    });
+    // Guarded: if the QRCode library failed to load (slow network, blocked
+    // script, etc.) this must NOT throw — an uncaught error here used to
+    // abort the entire render loop, leaving #reportArea empty and making
+    // Print/Download report "no cards found" even though data loaded fine.
+    try {
+      new QRCode(qrContainer, {
+        text: qrText,
+        width: 100, height: 100,
+        colorDark: '#1A0F08', colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    } catch (err) {
+      console.error('QR code generation failed for', stu['Name'], err);
+    }
   });
 
   /* Set watermark CSS var for print */
@@ -5445,125 +5427,6 @@ function safePrint() {
    ============================================================ */
 function clearOnFocus(el, def)  { if (el.value === def) el.value = ''; }
 function restoreOnBlur(el, def) { if (!el.value.trim()) el.value = def; }
-
-/* ============================================================
-   START CUSTOM EDIT SECTION — Performance Progress Tracker
-   Purpose: Calculate and display CA + Exam completion progress
-   per class and school-wide.
-   ============================================================ */
-
-/* Calculate progress stats from a list of student records */
-function calcProgressStats(records) {
-  if (!records.length) return { caFilled:0, caTotal:0, examFilled:0, examTotal:0 };
-
-  const headers    = Object.keys(records[0]);
-  const caKeys     = headers.filter(h => h.includes('_CA'));
-  const examKeys   = headers.filter(h => h.includes('_Exams'));
-
-  let caFilled = 0, caTotal = 0, examFilled = 0, examTotal = 0;
-
-  records.forEach(stu => {
-    caKeys.forEach(k => {
-      caTotal++;
-      const val = parseFloat(stu[k]);
-      if (!isNaN(val) && val > 0) caFilled++;
-    });
-    examKeys.forEach(k => {
-      examTotal++;
-      const val = parseFloat(stu[k]);
-      if (!isNaN(val) && val > 0) examFilled++;
-    });
-  });
-
-  return { caFilled, caTotal, examFilled, examTotal };
-}
-
-/* Build HTML for a progress card (CA or Exam) */
-function progressCardHtml(label, filled, total) {
-  const pct    = total > 0 ? Math.round((filled / total) * 100) : 0;
-  const color  = pct >= 80 ? '#C9973F' : pct >= 50 ? '#C9973F' : '#B3401F';
-  const pending = total - filled;
-  return `
-    <div class="progress-card">
-      <div class="progress-card-title">${label}</div>
-      <div class="progress-pct" style="color:${color};">${pct}%</div>
-      <div class="progress-bar-wrap">
-        <div class="progress-bar-fill" style="width:${pct}%;background:${color};"></div>
-      </div>
-      <div class="progress-detail">✅ Completed: ${filled} cells</div>
-      <div class="progress-detail">⏳ Pending: ${pending} cells</div>
-      <div class="progress-detail">📊 Total Cells: ${total}</div>
-    </div>`;
-}
-
-/* Load progress data for all classes */
-let currentProgressTerm = 'First Term';
-
-function selectProgressTerm(term, btn) {
-  currentProgressTerm = term;
-  document.querySelectorAll('.progress-term-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  // Reset results when term changes
-  document.getElementById('progress-class-list').innerHTML = '';
-  document.getElementById('progress-school-summary').style.display = 'none';
-}
-
-async function loadAllClassProgress() {
-  const loader  = $('progress-loading');
-  const listEl  = $('progress-class-list');
-  const summEl  = $('progress-school-summary');
-  const gridEl  = $('progress-school-grid');
-
-  loader.classList.add('visible');
-  listEl.innerHTML = '';
-  summEl.style.display = 'none';
-
-  let totalCaFilled = 0, totalCaTotal = 0, totalExamFilled = 0, totalExamTotal = 0;
-
-  for (const className of Object.keys(CLASS_LINKS)) {
-    if (!classHasAnyUrl(className)) continue;
-    const url = getTermUrl(className, currentProgressTerm);
-    if (!url) continue;
-    try {
-      const csv     = await fetchCSV(url);
-      const records = parseCSV(csv);
-      if (!records.length) continue;
-
-      const stats = calcProgressStats(records);
-      totalCaFilled   += stats.caFilled;
-      totalCaTotal    += stats.caTotal;
-      totalExamFilled += stats.examFilled;
-      totalExamTotal  += stats.examTotal;
-
-      const block = document.createElement('div');
-      block.style.marginBottom = '16px';
-      block.innerHTML = `
-        <div style="font-size:13px;font-weight:800;color:var(--ad-ink);margin-bottom:8px;padding:6px 10px;background:var(--ad-indigo-lt);border-left:3px solid var(--ad-indigo);border-radius:4px;letter-spacing:.02em;">📋 ${className}</div>
-        <div class="progress-tracker-grid">
-          ${progressCardHtml('CA Progress', stats.caFilled, stats.caTotal)}
-          ${progressCardHtml('Exam Progress', stats.examFilled, stats.examTotal)}
-        </div>`;
-      listEl.appendChild(block);
-    } catch(e) {
-      const errBlock = document.createElement('div');
-      errBlock.innerHTML = `<div style="color:var(--dash-danger);font-size:12px;margin-bottom:8px;">❌ ${className}: failed to load</div>`;
-      listEl.appendChild(errBlock);
-    }
-  }
-
-  loader.classList.remove('visible');
-
-  // School-wide summary
-  if (totalCaTotal > 0 || totalExamTotal > 0) {
-    gridEl.innerHTML = `
-      ${progressCardHtml('School-Wide CA Progress', totalCaFilled, totalCaTotal)}
-      ${progressCardHtml('School-Wide Exam Progress', totalExamFilled, totalExamTotal)}`;
-    summEl.style.display = 'block';
-  }
-
-  showToast('✅ Progress loaded for ' + currentProgressTerm + '!');
-}
-/* END CUSTOM EDIT SECTION — Progress Tracker */
 
 /* ============================================================
    START CUSTOM EDIT SECTION — Class Analytics
@@ -6180,8 +6043,6 @@ window.openClassDetail             = openClassDetail;
 window.filterDetailTable           = filterDetailTable;
 window.selectDetailTerm            = selectDetailTerm;
 window.generateFromDetail          = generateFromDetail;
-window.loadAllClassProgress        = loadAllClassProgress;
-window.selectProgressTerm          = selectProgressTerm;
 window.loadAllAnalytics            = loadAllAnalytics;
 window.downloadAnalyticsPDF        = downloadAnalyticsPDF;
 window.downloadAnalyticsPDF        = downloadAnalyticsPDF;
