@@ -621,8 +621,10 @@ body {
 }
 .rc-photo-box img { width:100%; height:100%; object-fit:cover; }
 
-.rc-motto { text-align:center; font-size:13px; font-weight:900; color:#2A1810; margin:4px 0 8px; }
+.rc-motto { text-align:center; font-size:13px; font-weight:900; color:#2A1810; margin:3px 0 0; }
 .rc-motto span { color:var(--rc-navy); }
+
+.rc-divider { border:0; border-top:1.5px solid var(--rc-navy); opacity:0.35; margin:8px 0; }
 
 /* ── Green "TERM REPORT SHEET" banner pill ─────────────────── */
 .rc-banner-wrap { text-align:center; margin-bottom:8px; }
@@ -3653,37 +3655,54 @@ const CREDENTIALS = {
    Paste the correct published CSV link for each term.
    To publish: Google Sheet → File → Share → Publish to web → CSV
    ============================================================ */
+/* ============================================================
+   CLASS_LINKS — GUIDE / HOW TO EDIT
+   ── STRUCTURE ──
+   Each class ARM (section) now has its OWN entry and its OWN three
+   Google Sheet CSV links (First / Second / Third Term). This is on
+   purpose: when each section has its own sheet, a report card
+   generated for "Primary 1A" only ever pulls Primary 1A's own
+   students, so positions/rankings are automatically calculated
+   within that one arm — never mixed with Primary 1B's students.
+
+   ── HOW TO ADD A NEW SHEET LINK ──
+   1. Publish that class arm's Google Sheet to the web (File →
+      Share → Publish to web → select the correct term's tab → CSV).
+   2. Paste the resulting link into the matching first/second/third
+      slot below. Leave a slot as "" (empty string) until it's ready
+      — the app already treats empty/placeholder links as "not set
+      up yet" everywhere (class grid, student login, etc.).
+
+   ── HOW TO EXPAND A CLASS TO A 3rd / 4th ARM (e.g. Primary 1C, 1D) ──
+   1. Copy one existing arm's block below, e.g. "Primary 1B": {...}.
+   2. Rename the key to "Primary 1C" (or "1D", and so on).
+   3. Paste in that new sheet's own First/Second/Third links (or
+      leave them "" until ready).
+   4. Do the SAME for CLASS_META just below this block — copy the
+      matching "Primary 1B" line, rename it to "Primary 1C".
+   That's it — every other part of the app (class grid, student
+   class dropdown, fees, CA tracker, report cards) reads its class
+   list directly from these two objects, so a new arm shows up
+   everywhere automatically. No other code needs to change.
+   ============================================================ */
 const CLASS_LINKS = {
-  "Primary 1": {
-    first:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT49ltNlKXgCs5-OlwP8vaoObY4O01AyHjHxdkvbROJDX58yEQd2xjxb7AeY8OHJw/pub?gid=1801045914&single=true&output=csv",
-    second: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT49ltNlKXgCs5-OlwP8vaoObY4O01AyHjHxdkvbROJDX58yEQd2xjxb7AeY8OHJw/pub?gid=621314920&single=true&output=csv",
-    third:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT49ltNlKXgCs5-OlwP8vaoObY4O01AyHjHxdkvbROJDX58yEQd2xjxb7AeY8OHJw/pub?gid=43356139&single=true&output=csv"
-  },
-  "Primary 2": {
-    first:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vR5IZ6Qd7Wtb-_j5fafsYfWkAkbacW8exrMiQqG2ABwMOlBK4WrNR8PnuCNyVvXZQ/pub?gid=418496752&single=true&output=csv",
-    second: "https://docs.google.com/spreadsheets/d/e/2PACX-1vR5IZ6Qd7Wtb-_j5fafsYfWkAkbacW8exrMiQqG2ABwMOlBK4WrNR8PnuCNyVvXZQ/pub?gid=621314920&single=true&output=csv",
-    third:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vR5IZ6Qd7Wtb-_j5fafsYfWkAkbacW8exrMiQqG2ABwMOlBK4WrNR8PnuCNyVvXZQ/pub?gid=1919215223&single=true&output=csv"
-  },
-  "Primary 3": {
-    first:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7MfaLhkJMks6l25Ys4n_XohaxuBpH_0VS0O4CYPU1qj7CG27L1pQ2yPDu_QBVZw/pub?gid=1860726&single=true&output=csv",
-    second: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7MfaLhkJMks6l25Ys4n_XohaxuBpH_0VS0O4CYPU1qj7CG27L1pQ2yPDu_QBVZw/pub?gid=621314920&single=true&output=csv",
-    third:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7MfaLhkJMks6l25Ys4n_XohaxuBpH_0VS0O4CYPU1qj7CG27L1pQ2yPDu_QBVZw/pub?gid=201109747&single=true&output=csv"
-  },
-  "Primary 4": {
-    first:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXCANqaiReTcJoq3R1DT9V7KYTGxNirO9TRQX3psMLe2Jrwt4QbGrfdMoRqIQTvw/pub?gid=2120754990&single=true&output=csv",
-    second: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXCANqaiReTcJoq3R1DT9V7KYTGxNirO9TRQX3psMLe2Jrwt4QbGrfdMoRqIQTvw/pub?gid=621314920&single=true&output=csv",
-    third:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vTXCANqaiReTcJoq3R1DT9V7KYTGxNirO9TRQX3psMLe2Jrwt4QbGrfdMoRqIQTvw/pub?gid=817020167&single=true&output=csv"
-  },
-  "Primary 5": {
-    first:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPyVp5PrHjKQjvqt0RaUNrfkOSWsXlaC4H6Edt1JG12ps6_YunlO-gz9ONLnqUfQ/pub?gid=1773310207&single=true&output=csv",
-    second: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPyVp5PrHjKQjvqt0RaUNrfkOSWsXlaC4H6Edt1JG12ps6_YunlO-gz9ONLnqUfQ/pub?gid=621314920&single=true&output=csv",
-    third:  "https://docs.google.com/spreadsheets/d/e/2PACX-1vSPyVp5PrHjKQjvqt0RaUNrfkOSWsXlaC4H6Edt1JG12ps6_YunlO-gz9ONLnqUfQ/pub?gid=114045078&single=true&output=csv"
-  },
-  "Primary 6": {
-    first:  "",
-    second: "",
-    third:  ""
-  },
+  "Primary 1A": { first: "", second: "", third: "https://docs.google.com/spreadsheets/d/e/2PACX-1vR8aPVI27-TtvQGnG8AdQRSKNP_wBe9CNQyMlmZiAYg2SoWFqeuJ7elMZP0bnb0PZSY7k9w4ohCiLEK/pub?gid=0&single=true&output=csv" },
+  "Primary 1B": { first: "", second: "", third: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRZnxHX-hg7eJe6DjFz8Ye8fPtXPKyZOX0t7qPoxyUjytm0AU3cG58OWEArNhONOx1igpqihcp1tp32/pub?gid=1394773221&single=true&output=csv" },
+
+  "Primary 2A": { first: "", second: "", third: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSeGVSQjGJ_WTlSeYISh3aEHeI2vFlGGFD7LWJuRBbMkqhncZgjF6ghVq4Za2f4QVzaPzrYz1XDLX7t/pub?gid=0&single=true&output=csv" },
+  "Primary 2B": { first: "", second: "", third: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTBRNQYBfJKAJKt2ClEfR6MM147fgHnXNVO5RpPAbbU9s1PbUfd5TJUMWHlI2K6Q4GMffzzc5A-qAJr/pub?gid=0&single=true&output=csv" },
+
+  "Primary 3A": { first: "", second: "", third: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRpKjIembN66HPriTAW9io8gCOwnbkHVUzdhzdDbdhbD5NXTHiGHxnFsFZHYSIwtnHqljKCkCcdRq4e/pub?gid=0&single=true&output=csv" },
+  "Primary 3B": { first: "", second: "", third: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQBVceiBCJom_CyoSgdNPONIP8E5Mk_XiNkihSACtLTv4wqbZh5kCIasLOJeQBc7ChXo55I_3cxB0D0/pub?gid=257347642&single=true&output=csv" },
+
+  "Primary 4A": { first: "", second: "", third: "https://docs.google.com/spreadsheets/d/e/2PACX-1vTBep6FiqArlCJHRLYW1GVBEBRFI4halhNATQW8xjcQ9kQBqvJxcCJu-shQ7aGULBKXUMeXieZksSOt/pub?gid=0&single=true&output=csv" },
+  "Primary 4B": { first: "", second: "", third: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQwXaUOwmNnTZvPeUSTAQdSIqejwbqS5nzqqafBWkfTN6U168L9pdeKdZTYcNDquIHhgktLAGUSKWnI/pub?gid=0&single=true&output=csv" },
+
+  "Primary 5A": { first: "", second: "", third: "https://docs.google.com/spreadsheets/d/e/2PACX-1vS5_XxUPkInHp38b0PKlFbce32nNWBcCLe9OpWIXlc7B596WrNxbr6-0xkvESvIZXg5Z1zBRfmz-yWC/pub?output=csv" },
+  "Primary 5B": { first: "", second: "", third: "https://docs.google.com/spreadsheets/d/e/2PACX-1vRNoSKvdtktchThzia3i4WmU-25JeUyJ1aQ5388pFf0QgTLGeyZ0XiUd9J3oVo8E_wjmtjuBaEo7nv9/pub?gid=1979559050&single=true&output=csv" },
+
+  "Primary 6A": { first: "", second: "", third: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQ_MTOXs0gNNiwJYe4sLJe7jrJH92NGt-NSJh-B2PT81Xh6xdrubbJrLhaJZKBli_zFaalPnmZTmhka/pub?gid=0&single=true&output=csv" },
+  "Primary 6B": { first: "", second: "", third: "https://docs.google.com/spreadsheets/d/e/2PACX-1vQujOeStPoe78kBunsnNqEIGTnAv_4ncMSGE_CQWVyvMOxRmMCNWDERtcKXr4rnD8K0WtC1SI2w8gN2/pub?gid=835036433&single=true&output=csv" },
 };
 
 /* Display metadata for class grid cards
@@ -3691,14 +3710,21 @@ const CLASS_LINKS = {
    icon: any emoji
    category: "primary"
    badge: same as category (controls badge color)
+   Keep this list in sync with CLASS_LINKS above — one line per key.
 */
 const CLASS_META = {
-  "Primary 1": { icon:"📚", category:"primary", badge:"primary" },
-  "Primary 2": { icon:"📚", category:"primary", badge:"primary" },
-  "Primary 3": { icon:"📚", category:"primary", badge:"primary" },
-  "Primary 4": { icon:"📚", category:"primary", badge:"primary" },
-  "Primary 5": { icon:"📚", category:"primary", badge:"primary" },
-  "Primary 6": { icon:"📚", category:"primary", badge:"primary" },
+  "Primary 1A": { icon:"📚", category:"primary", badge:"primary" },
+  "Primary 1B": { icon:"📚", category:"primary", badge:"primary" },
+  "Primary 2A": { icon:"📚", category:"primary", badge:"primary" },
+  "Primary 2B": { icon:"📚", category:"primary", badge:"primary" },
+  "Primary 3A": { icon:"📚", category:"primary", badge:"primary" },
+  "Primary 3B": { icon:"📚", category:"primary", badge:"primary" },
+  "Primary 4A": { icon:"📚", category:"primary", badge:"primary" },
+  "Primary 4B": { icon:"📚", category:"primary", badge:"primary" },
+  "Primary 5A": { icon:"📚", category:"primary", badge:"primary" },
+  "Primary 5B": { icon:"📚", category:"primary", badge:"primary" },
+  "Primary 6A": { icon:"📚", category:"primary", badge:"primary" },
+  "Primary 6B": { icon:"📚", category:"primary", badge:"primary" },
 };
 
 /* START CUSTOM EDIT SECTION — School Websites Config
@@ -5047,11 +5073,12 @@ function renderCards(container, rawStudents, formMasterOverride) {
             <h2>${escapeHtml(SCHOOL_CONFIG.name)}</h2>
             <p class="rc-address">${escapeHtml(SCHOOL_CONFIG.address)}</p>
             ${contactHtml}
+            <div class="rc-motto"><span>MOTTO:</span> ${escapeHtml(SCHOOL_CONFIG.motto).toUpperCase()}</div>
           </div>
           <div class="rc-photo-box">${photoHtml}</div>
         </div>
 
-        <div class="rc-motto"><span>MOTTO:</span> ${escapeHtml(SCHOOL_CONFIG.motto).toUpperCase()}</div>
+        <hr class="rc-divider">
 
         <div class="rc-banner-wrap">
           <span class="rc-banner">${escapeHtml(stu.term).toUpperCase()} REPORT SHEET</span>
