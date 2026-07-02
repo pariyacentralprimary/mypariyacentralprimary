@@ -2958,11 +2958,6 @@ canvas.pa-chart {
               <div class="guide-step"><h4>Class-Specific Report Card Colors</h4><p>Find the section labeled "REPORT CARD — CLASS-SPECIFIC COLOURS". The primary class category can have its own color theme.</p></div>
               <div class="guide-step"><h4>School Name, Motto, Address</h4><p>Find the <code>SCHOOL_CONFIG</code> object and edit: <code>name</code>, <code>motto</code>, <code>address</code>, <code>session</code>, <code>resumption</code>.</p></div>
             </div>
-            <div class="guide-section"><h3>👨‍🏫 Teachers Sheet Structure</h3>
-              <div class="guide-step"><h4>Required Column Headers (Teachers CSV)</h4>
-                <p>Your Teachers Google Sheet must use: <code>TeacherName</code>, <code>ClassCategory</code> (Primary), <code>Subjects</code>, <code>ClassType</code>, <code>Qualification</code>, <code>Phone</code>, <code>Salary</code>, <code>Month1</code>, <code>Month2</code>, <code>Month3</code>.</p>
-              </div>
-            </div>
             <div class="guide-section"><h3>🏆 Awards &amp; Certificates</h3>
               <div class="guide-step"><h4>Best Student Awards (Automatic)</h4><p>Go to Analytics → Load All Analytics first. Then go to Awards → Best Student Award and click Generate. Certificates are produced automatically for all primary classes.</p></div>
               <div class="guide-step"><h4>Certificate Signatures</h4><p>Upload signature images to PostImage and paste direct links into <code>SCHOOL_CONFIG</code>: <code>headmasterSig</code>, <code>primaryFormMasterSig</code>.</p></div>
@@ -4237,19 +4232,25 @@ function initAdminDashboard() {
 /* Count students from all classes with valid CSV links */
 async function countAllStudents() {
   let total = 0;
-  // Count from first-term CSV of each class (to avoid triple-counting)
+  // Count students once per class — use whichever term (First/Second/Third)
+  // actually has data for that class, instead of requiring First Term
+  // specifically. This avoids under-counting classes that haven't had
+  // their First Term sheet filled in yet but do have Second/Third Term data.
   const promises = Object.entries(CLASS_LINKS)
     .filter(([name]) => classHasAnyUrl(name))
     .map(async ([name]) => {
-      try {
-        const url = getTermUrl(name, 'First Term');
-        if (!url) return 0;
-        const csv = await fetchCSV(url);
-        const records = parseCSV(csv);
-        return records.length;
-      } catch {
-        return 0;
+      for (const term of ['First Term', 'Second Term', 'Third Term']) {
+        try {
+          const url = getTermUrl(name, term);
+          if (!url) continue;
+          const csv = await fetchCSV(url);
+          const records = parseCSV(csv);
+          if (records.length) return records.length;
+        } catch {
+          /* try the next term */
+        }
       }
+      return 0;
     });
   const counts = await Promise.all(promises);
   counts.forEach(c => total += c);
