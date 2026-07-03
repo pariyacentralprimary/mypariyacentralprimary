@@ -635,9 +635,9 @@ body {
 }
 
 /* ── Bordered info box with student bio-data fields ────────── */
-.rc-infobox { border:1.5px solid var(--rc-navy); border-radius:10px; padding:8px 12px; margin-bottom:10px; }
+.rc-infobox { border:2px solid var(--rc-navy); border-radius:10px; padding:8px 12px; margin-bottom:10px; }
 .rc-info-row { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 14px; padding:3px 0; font-size:11px; font-weight:800; }
-.rc-info-row + .rc-info-row { border-top:1px dashed rgba(61,35,20,0.18); }
+.rc-info-row + .rc-info-row { border-top:1.5px solid var(--rc-navy); }
 .rc-field { display:inline-flex; align-items:baseline; gap:4px; white-space:nowrap; }
 .rc-field .rc-label { color:var(--rc-navy); font-weight:900; }
 .rc-field .rc-value { border-bottom:1px solid rgba(42,24,16,0.5); min-width:60px; display:inline-block; padding:0 2px; font-weight:800; color:#2A1810; text-align:center; }
@@ -672,13 +672,13 @@ body {
 .rc-box-head { color:#fff; font-size:10px; font-weight:900; text-align:center; padding:5px 4px; letter-spacing:0.03em; text-transform:uppercase; }
 .rc-domains-box .rc-box-head { background:var(--rc-green); }
 .rc-domains-box table { width:100%; border-collapse:collapse; font-size:9.5px; flex:1; }
-.rc-domains-box td { padding:2.5px 6px !important; border-bottom:1px solid var(--rc-green-bg); font-weight:800; color:#2A1810; }
-.rc-domains-box td.rc-dom-rating { text-align:right; width:34px; border-left:1px solid var(--rc-green-bg); }
+.rc-domains-box td { padding:2.5px 6px !important; border-bottom:1.5px solid var(--rc-green); font-weight:800; color:#2A1810; }
+.rc-domains-box td.rc-dom-rating { text-align:right; width:34px; border-left:1.5px solid var(--rc-green); }
 
 .rc-keys-box .rc-box-head { background:var(--rc-orange); }
 .rc-keys-box .rc-keys-sub { font-size:9px; font-weight:900; color:var(--rc-orange); background:var(--rc-orange-bg); text-align:center; padding:2px; text-transform:uppercase; letter-spacing:0.03em; }
 .rc-keys-box table { width:100%; border-collapse:collapse; font-size:9px; }
-.rc-keys-box th, .rc-keys-box td { border:1px solid var(--rc-orange-bg); padding:2px 3px !important; font-weight:800; color:#2A1810; text-align:center; }
+.rc-keys-box th, .rc-keys-box td { border:1.5px solid var(--rc-orange); padding:2px 3px !important; font-weight:800; color:#2A1810; text-align:center; }
 .rc-keys-box thead th { background:var(--rc-orange-bg); color:var(--rc-orange); }
 
 .rc-qr-box .rc-box-head { background:var(--rc-purple); }
@@ -700,7 +700,7 @@ body {
 .sig-caption { font-size:10px; color:var(--muted); margin-top:2px; }
 
 .qr-code-container {
-  width:88px; height:88px; background:#fff; padding:1px;
+  width:98px; height:98px; background:#fff; padding:1px;
   border:1px solid var(--rc-purple);
   display:flex; align-items:center; justify-content:center;
 }
@@ -1086,7 +1086,7 @@ body {
   .card-subjects tbody tr:nth-child(even) td { background:var(--rc-blue-bg) !important; }
 
   /* Preserve bio-data info box */
-  .rc-infobox { border:1.5px solid var(--rc-navy) !important; }
+  .rc-infobox { border:2px solid var(--rc-navy) !important; }
   .rc-banner { background:var(--rc-green) !important; color:#fff !important; }
   .rc-perf-banner { background:var(--rc-blue) !important; color:#fff !important; }
 
@@ -4789,11 +4789,33 @@ function renderCards(container, rawStudents, formMasterOverride) {
 
   // Detect subjects from column headers (e.g. "Mathematics_CA1" → "Mathematics")
   const allHeaders = Object.keys(rawStudents[0]);
-  const subjects   = [...new Set(
-    allHeaders
-      .filter(h => h.includes('_CA') || h.includes('_Exams'))
-      .map(h => h.split('_')[0])
-  )];
+
+  // FIX: a subject was showing up twice on the printed report whenever its
+  // CA1/CA2/CA3/Exams columns weren't spelled identically (e.g. "Mathematics_CA1"
+  // vs "mathematics_CA2", or an extra space) — each spelling created its own
+  // Set entry. We now group headers by a normalized (trimmed, single-spaced,
+  // lower-cased) subject name, and keep a lookup back to the ACTUAL header
+  // text so score values are still read correctly for every column.
+  const normalizeHeader = h => h.replace(/\s+/g, ' ').trim().toLowerCase();
+  const headerLookup = {};
+  allHeaders.forEach(h => { headerLookup[normalizeHeader(h)] = h; });
+
+  const seenSubjects = new Map(); // normalized subject name -> display name
+  allHeaders.forEach(h => {
+    if (h.includes('_CA') || h.includes('_Exams')) {
+      const rawName = h.split('_')[0];
+      const key = normalizeHeader(rawName);
+      if (!seenSubjects.has(key)) seenSubjects.set(key, rawName.trim());
+    }
+  });
+  const subjects = [...seenSubjects.values()];
+
+  // Look up a subject's score column regardless of minor case/spacing
+  // differences between its CA1/CA2/CA3/Exams header variants.
+  const getSubjVal = (stu, sub, suffix) => {
+    const actualHeader = headerLookup[normalizeHeader(`${sub}_${suffix}`)];
+    return actualHeader ? (stu[actualHeader] || 0) : 0;
+  };
 
   if (!subjects.length) {
     showToast('❌ No subject columns found (e.g. Math_CA1, Math_Exams)', 'error');
@@ -4809,10 +4831,10 @@ function renderCards(container, rawStudents, formMasterOverride) {
     const processedSubjects = [];
 
     subjects.forEach(sub => {
-      const s1   = stu[`${sub}_CA1`]   || 0;
-      const s2   = stu[`${sub}_CA2`]   || 0;
-      const s3   = mode.isJssSs ? (stu[`${sub}_CA3`] || 0) : 0;
-      const exam = stu[`${sub}_Exams`] || 0;
+      const s1   = getSubjVal(stu, sub, 'CA1');
+      const s2   = getSubjVal(stu, sub, 'CA2');
+      const s3   = mode.isJssSs ? getSubjVal(stu, sub, 'CA3') : 0;
+      const exam = getSubjVal(stu, sub, 'Exams');
       const total = s1 + s2 + s3 + exam;
       const grade = calculateGrade(total);
       totalMarks += total; subjectCount++;
@@ -4935,6 +4957,7 @@ function renderCards(container, rawStudents, formMasterOverride) {
       /* ─── Subject rows (Progress column REMOVED; Subject Position ADDED) ─── */
       const subjRows = stu.subjects.map(s => `
         <tr>
+          <td>${s.no}</td>
           <td style="text-align:left">${escapeHtml(s.subj)}</td>
           <td>${displayScore(s.s1)}</td>
           <td>${displayScore(s.s2)}</td>
@@ -5120,6 +5143,7 @@ function renderCards(container, rawStudents, formMasterOverride) {
           <table>
             <thead>
               <tr>
+                <th>S/N</th>
                 <th style="text-align:left">Subject</th>
                 <th>1st CA (${mode.s1})</th>
                 <th>2nd CA (${mode.s2})</th>
@@ -5221,7 +5245,7 @@ function renderCards(container, rawStudents, formMasterOverride) {
     try {
       new QRCode(qrContainer, {
         text: qrText,
-        width: 100, height: 100,
+        width: 112, height: 112,
         colorDark: '#1A0F08', colorLight: '#ffffff',
         correctLevel: QRCode.CorrectLevel.M
       });
