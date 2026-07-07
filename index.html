@@ -2179,11 +2179,14 @@ canvas.pa-chart {
   display: flex; justify-content: space-between; align-items: flex-end; width: 100%;
   margin-top: 24px; position: relative; z-index: 1;
 }
-.cert-testi-stamp-block, .cert-testi-sig-block { text-align: center; width: 152px; }
+.cert-testi-stamp-block, .cert-testi-sig-block { text-align: center; width: 165px; }
 .cert-testi-stamp-circle {
-  width: 104px; height: 104px; border-radius: 50%; margin: 0 auto 6px;
-  border: 1.5px dashed #2a4d9e; position: relative;
+  width: 118px; height: 118px; border-radius: 50%; margin: 0 auto 6px;
+  border: 1.5px solid #2a4d9e; position: relative;
   display: flex; align-items: center; justify-content: center;
+}
+.cert-testi-stamp-circle-dotted {
+  position: absolute; inset: 9px; border-radius: 50%; border: 1.5px dotted #2a4d9e;
 }
 .cert-testi-stamp-curved-text { position: absolute; inset: 0; }
 .cert-testi-stamp-curved-text span {
@@ -2191,11 +2194,16 @@ canvas.pa-chart {
   color: #2a4d9e; font-family: 'Manrope', sans-serif; letter-spacing: .5px;
   transform-origin: 0 0;
 }
-.cert-testi-stamp-sig { width: 44px; height: auto; max-height: 22px; object-fit: contain; opacity: .85; margin-bottom: 1px; }
-.cert-testi-stamp-date { font-size: 6.6px; font-weight: 700; color: #2a4d9e; }
-.cert-testi-stamp-label { font-size: 10px; font-weight: 800; color: #222; letter-spacing: 1px; margin-top: 2px; }
-.cert-testi-seal-svg { width: 80px; height: 80px; margin: 0 auto 8px; display: block; }
-.cert-testi-sig-img { height: 36px; max-width: 128px; object-fit: contain; display: block; margin: 0 auto 3px; }
+.cert-testi-stamp-stars { position: absolute; inset: 0; }
+.cert-testi-stamp-stars span {
+  position: absolute; left: 50%; top: 50%; font-size: 8px; color: #2a4d9e;
+  transform-origin: 0 0;
+}
+.cert-testi-stamp-sig { width: 78px; height: auto; max-height: 40px; object-fit: contain; opacity: .92; margin-bottom: 1px; transform: rotate(-6deg); }
+.cert-testi-stamp-date { font-size: 6.8px; font-weight: 700; color: #2a4d9e; margin-top: 1px; }
+.cert-testi-stamp-label { font-size: 10px; font-weight: 800; color: #222; letter-spacing: 1px; margin-top: 4px; }
+.cert-testi-seal-svg { width: 82px; height: 82px; margin: 0 auto 8px; display: block; }
+.cert-testi-sig-img { height: 66px; max-width: 160px; object-fit: contain; display: block; margin: 0 auto 3px; transform: rotate(-5deg); }
 .cert-testi-sig-line { border-top: 1.3px solid #333; width: 100%; margin: 2px 0; }
 .cert-testi-sig-title { font-size: 10px; font-weight: 800; color: #1c1c1c; letter-spacing: .6px; margin-top: 2px; }
 
@@ -8078,6 +8086,22 @@ function curvedStampText(text, radius, fontSize, color) {
   return `<div class="cert-testi-stamp-curved-text">${spans}</div>`;
 }
 
+/* A small ring of 5-pointed stars along the bottom arc of the stamp's
+   inner dotted circle — matches the decorative stars on the school's
+   official paper stamp. */
+function curvedStampStars(count, radius, fontSize, color) {
+  count = count || 5; radius = radius || 40; fontSize = fontSize || 8; color = color || '#2a4d9e';
+  const totalArc = 90;
+  const start = 180 - totalArc / 2;
+  const step  = count > 1 ? totalArc / (count - 1) : 0;
+  const spans = [];
+  for (let i = 0; i < count; i++) {
+    const angle = start + step * i;
+    spans.push(`<span style="position:absolute;left:50%;top:50%;font-size:${fontSize}px;color:${color};transform:translate(-50%,-50%) rotate(${angle.toFixed(2)}deg) translateY(-${radius}px) rotate(180deg);">★</span>`);
+  }
+  return `<div class="cert-testi-stamp-stars">${spans.join('')}</div>`;
+}
+
 /* Build the testimonial certificate HTML for one graduating Primary 6 student.
    Flat, front-facing digital-certificate design (no paper texture/shadow) —
    navy Greek-key border, red blackletter "Testimonial" title, school stamp
@@ -8124,7 +8148,7 @@ function buildTestimonialCertHTML(opts) {
       <div class="cert-testi-line">Has Completed His/Her Primary School Education</div>
       <div class="cert-testi-line">From the above mentioned School</div>
       <div class="cert-testi-yearrow">From the year: <b>${fromYear}</b> &nbsp;&nbsp; To: <b>${toYear}</b></div>
-      <div class="cert-testi-conduct">And His/Her conduct was: <b>GOOD</b> during His/Her stay in the School.</div>
+      <div class="cert-testi-conduct">And His/Her conduct was: <b>GOOD</b> during His/Her stay<br>in the School.</div>
       <div class="cert-testi-namesign-row">
         <div>Name:<span class="field-line">${escapeHtml(firstName.toUpperCase())}</span></div>
         <div>Sign:<span class="field-line">&nbsp;</span></div>
@@ -8132,7 +8156,9 @@ function buildTestimonialCertHTML(opts) {
       <div class="cert-testi-seals-row">
         <div class="cert-testi-stamp-block">
           <div class="cert-testi-stamp-circle">
+            <div class="cert-testi-stamp-circle-dotted"></div>
             ${curvedStampText(schoolName.toUpperCase())}
+            ${curvedStampStars()}
             <div style="display:flex;flex-direction:column;align-items:center;">
               <img class="cert-testi-stamp-sig" src="${SCHOOL_CONFIG.headmasterSig}" alt="" onerror="this.style.display='none'">
               <div class="cert-testi-stamp-date">DATE: ${dateShort}</div>
