@@ -24,7 +24,7 @@
      ============================================================ -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500&family=Manrope:wght@400;500;600;700;800&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500&family=Manrope:wght@400;500;600;700;800&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Great+Vibes&family=Dancing+Script:wght@500;700&family=UnifrakturCook:wght@700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
 <style>
@@ -2081,6 +2081,125 @@ canvas.pa-chart {
 }
 
 /* ══════════════════════════════════════════════════════
+   TESTIMONIAL CERTIFICATE (Primary 6 Graduation)
+   Flat, front-facing digital-certificate design — no paper
+   texture, no shadows/glare — a clean vector-style layout
+   with a navy Greek-key border, modelled on the school's
+   official testimonial.
+   ══════════════════════════════════════════════════════ */
+.cert-portrait-wrapper { width: 100%; max-width: 640px; margin: 0 auto; }
+.cert-testimonial {
+  width: 640px; min-height: 906px;
+  position: relative;
+  background: #FDFBF3;
+  font-family: 'Manrope', sans-serif;
+  page-break-inside: avoid;
+  padding: 26px;
+  box-sizing: border-box;
+}
+.cert-gk-strip-top, .cert-gk-strip-bottom {
+  position: absolute; left: 0; right: 0; height: 24px; z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='20' height='20' fill='%23142e6e'/%3E%3Cpath d='M0 14 H6 V6 H14 V14 H20' stroke='white' stroke-width='3' fill='none'/%3E%3C/svg%3E");
+  background-repeat: repeat-x; background-size: 20px 24px;
+}
+.cert-gk-strip-top { top: 0; }
+.cert-gk-strip-bottom { bottom: 0; }
+.cert-gk-strip-left, .cert-gk-strip-right {
+  position: absolute; top: 0; bottom: 0; width: 24px; z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='20' height='20' fill='%23142e6e'/%3E%3Cpath d='M14 0 V6 H6 V14 H14 V20' stroke='white' stroke-width='3' fill='none'/%3E%3C/svg%3E");
+  background-repeat: repeat-y; background-size: 24px 20px;
+}
+.cert-gk-strip-left { left: 0; }
+.cert-gk-strip-right { right: 0; }
+.cert-gk-corner {
+  position: absolute; width: 24px; height: 24px; background: #142e6e; z-index: 2;
+}
+.cert-gk-corner::after {
+  content: ''; position: absolute; inset: 4px; border: 2px solid #fff;
+}
+.cert-testimonial-inner {
+  position: absolute; top: 32px; left: 32px; right: 32px; bottom: 32px;
+  border: 2px solid #142e6e; border-radius: 2px; z-index: 1;
+  padding: 30px 36px; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center;
+  overflow: hidden; background: #FDFBF3;
+}
+/* small bracket ornaments at the 4 corners of the inner frame */
+.cert-testi-bracket {
+  position: absolute; width: 20px; height: 20px; z-index: 3; pointer-events: none;
+}
+.cert-testi-bracket.tl { top: 30px; left: 30px; border-top: 3px solid #142e6e; border-left: 3px solid #142e6e; }
+.cert-testi-bracket.tr { top: 30px; right: 30px; border-top: 3px solid #142e6e; border-right: 3px solid #142e6e; }
+.cert-testi-bracket.bl { bottom: 30px; left: 30px; border-bottom: 3px solid #142e6e; border-left: 3px solid #142e6e; }
+.cert-testi-bracket.br { bottom: 30px; right: 30px; border-bottom: 3px solid #142e6e; border-right: 3px solid #142e6e; }
+/* passport placeholder accent (top right) */
+.cert-testi-passport-mark { position: absolute; top: 60px; right: 56px; width: 90px; height: 76px; z-index: 2; pointer-events: none; }
+.cert-testi-passport-mark .l1 { position: absolute; top: 0; right: 0; width: 78px; height: 2px; background: #C0272D; }
+.cert-testi-passport-mark .l2 { position: absolute; top: 0; right: 0; width: 2px; height: 76px; background: #C0272D; }
+.cert-testi-passport-mark .txt {
+  position: absolute; top: 16px; right: 18px; font-size: 11px; font-weight: 700; color: #9a9a9a;
+  transform: rotate(38deg); transform-origin: right top; letter-spacing: 1px; opacity: .55;
+  font-family: 'Manrope', sans-serif;
+}
+.cert-testi-header-row {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  margin-bottom: 4px; position: relative; z-index: 1; width: 100%;
+}
+.cert-testi-school-name { font-size: 25px; font-weight: 900; color: #142e6e; text-align: center; letter-spacing: .4px; line-height: 1.2; text-transform: uppercase; }
+.cert-testi-school-sub  { font-size: 12.5px; color: #161616; text-align: center; font-weight: 800; margin-top: 3px; text-transform: uppercase; letter-spacing: .3px; }
+.cert-testi-title {
+  font-family: 'UnifrakturCook', 'Great Vibes', cursive; font-weight: 700; font-size: 46px; color: #C0272D;
+  margin: 16px 0 0; text-align: center; line-height: 1; position: relative; z-index: 1;
+}
+.cert-testi-title-underline { width: 200px; height: 2px; background: #C0272D; margin: 8px 0 16px; position: relative; z-index: 1; }
+.cert-testi-whom    { font-size: 15px; font-weight: 800; color: #161616; text-align: center; position: relative; z-index: 1; }
+.cert-testi-certify { font-size: 13.5px; font-weight: 700; color: #232323; margin: 3px 0 20px; text-align: center; position: relative; z-index: 1; }
+.cert-testi-name {
+  font-family: 'Manrope', sans-serif; font-size: 27px; font-weight: 800; color: #142e6e;
+  text-transform: uppercase; letter-spacing: .6px;
+  border-bottom: 1.5px solid #222; padding: 0 30px 8px; margin-bottom: 16px;
+  min-width: 66%; text-align: center; position: relative; z-index: 1;
+}
+.cert-testi-classarm { font-size: 11px; color: #6b6b6b; font-style: italic; margin: -10px 0 16px; position: relative; z-index: 1; }
+.cert-testi-line { font-size: 14px; font-weight: 700; color: #1c1c1c; text-align: center; margin: 4px 0; line-height: 1.6; max-width: 480px; position: relative; z-index: 1; }
+.cert-testi-yearrow { font-size: 14px; font-weight: 700; color: #1c1c1c; margin: 16px 0 12px; text-align: center; position: relative; z-index: 1; }
+.cert-testi-yearrow b { text-decoration: underline; text-underline-offset: 3px; color: #142e6e; font-family: 'Manrope',sans-serif; padding: 0 8px; }
+.cert-testi-conduct { font-size: 14px; font-weight: 700; margin: 4px 0 30px; text-align: center; position: relative; z-index: 1; }
+.cert-testi-conduct b { text-decoration: underline; text-underline-offset: 3px; color: #142e6e; }
+.cert-testi-namesign-row {
+  display: flex; justify-content: space-between; width: 100%; max-width: 480px;
+  margin: 6px 0 auto; font-size: 14px; font-weight: 800; color: #1c1c1c;
+  position: relative; z-index: 1;
+}
+.cert-testi-namesign-row .field-line {
+  display: inline-block; border-bottom: 1.3px solid #333; min-width: 150px; margin-left: 8px;
+  color: #142e6e; font-weight: 800; text-align: center; padding-bottom: 2px;
+}
+.cert-testi-seals-row {
+  display: flex; justify-content: space-between; align-items: flex-end; width: 100%;
+  margin-top: 24px; position: relative; z-index: 1;
+}
+.cert-testi-stamp-block, .cert-testi-sig-block { text-align: center; width: 152px; }
+.cert-testi-stamp-circle {
+  width: 104px; height: 104px; border-radius: 50%; margin: 0 auto 6px;
+  border: 1.5px dashed #2a4d9e; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.cert-testi-stamp-curved-text { position: absolute; inset: 0; }
+.cert-testi-stamp-curved-text span {
+  position: absolute; left: 50%; top: 50%; font-size: 8px; font-weight: 800;
+  color: #2a4d9e; font-family: 'Manrope', sans-serif; letter-spacing: .5px;
+  transform-origin: 0 0;
+}
+.cert-testi-stamp-sig { width: 44px; height: auto; max-height: 22px; object-fit: contain; opacity: .85; margin-bottom: 1px; }
+.cert-testi-stamp-date { font-size: 6.6px; font-weight: 700; color: #2a4d9e; }
+.cert-testi-stamp-label { font-size: 10px; font-weight: 800; color: #222; letter-spacing: 1px; margin-top: 2px; }
+.cert-testi-seal-svg { width: 80px; height: 80px; margin: 0 auto 8px; display: block; }
+.cert-testi-sig-img { height: 36px; max-width: 128px; object-fit: contain; display: block; margin: 0 auto 3px; }
+.cert-testi-sig-line { border-top: 1.3px solid #333; width: 100%; margin: 2px 0; }
+.cert-testi-sig-title { font-size: 10px; font-weight: 800; color: #1c1c1c; letter-spacing: .6px; margin-top: 2px; }
+
+/* ══════════════════════════════════════════════════════
    CA TRACKER TAB — Custom Styles
    ══════════════════════════════════════════════════════ */
 .cat-term-btn {
@@ -2930,14 +3049,11 @@ canvas.pa-chart {
           </div>
           <div id="award-testimonial" class="award-panel" style="display:none;">
             <div class="section-heading">🎓 Automatic Testimonial Certificate</div>
-            <p style="font-size:12px;color:var(--dash-muted);font-weight:600;margin-bottom:16px;max-width:520px;">
-              Automatically generate testimonial certificates for Primary 6 students who have completed and are graduating from Primary School.
+            <p style="font-size:12px;color:var(--dash-muted);font-weight:600;margin-bottom:16px;max-width:560px;">
+              Automatically generates a testimonial certificate for every Primary 6 student (all arms) found in their class sheet — for students who have completed and are graduating from Primary School. Student's signature is left blank for them to sign; the Head Teacher's signature and school stamp are added automatically.
             </p>
-            <div style="text-align:center;padding:48px 20px;background:var(--dash-card);border:1px dashed var(--dash-border);border-radius:14px;max-width:480px;">
-              <div style="font-size:38px;margin-bottom:10px;">🚧</div>
-              <div style="font-size:16px;font-weight:800;color:var(--dash-accent);margin-bottom:6px;">Coming Soon</div>
-              <div style="font-size:12px;color:var(--dash-muted);font-weight:600;">This feature is being built and will be available in a future update.</div>
-            </div>
+            <button class="btn-export-pdf" style="background:linear-gradient(135deg,#6B2E3B,#4A2530);" onclick="generateTestimonialCertificates()">🎓 Generate Testimonial Certificates</button>
+            <div id="testimonial-certs-preview" style="margin-top:16px;"></div>
           </div>
         </div>
 
@@ -2961,6 +3077,7 @@ canvas.pa-chart {
             <div class="guide-section"><h3>🏆 Awards &amp; Certificates</h3>
               <div class="guide-step"><h4>Best Student Awards (Automatic)</h4><p>Go to Analytics → Load All Analytics first. Then go to Awards → Best Student Award and click Generate. Certificates are produced automatically for all primary classes.</p></div>
               <div class="guide-step"><h4>Certificate Signatures</h4><p>Upload signature images to PostImage and paste direct links into <code>SCHOOL_CONFIG</code>: <code>headmasterSig</code>, <code>primaryFormMasterSig</code>.</p></div>
+              <div class="guide-step"><h4>Testimonial Certificates (Automatic)</h4><p>Go to Awards → Testimonial Certificate and click Generate. It pulls every Primary 6 student (all arms) from their class sheet and produces one testimonial per student, with the Head Teacher's signature and school stamp applied automatically — the student's own signature line is left blank for them to sign.</p></div>
             </div>
             <div class="guide-section"><h3>🔐 Student Term PIN Codes</h3>
               <div class="guide-step"><h4>Term Lock PINs (Student Dashboard)</h4>
@@ -7908,9 +8025,198 @@ function buildTeacherCertHTML(opts) {
   </div>`;
 }
 
-/* Download a cert element as landscape PDF */
-async function downloadCertPDF(certEl, filename) {
+/* ============================================================
+   TESTIMONIAL CERTIFICATE (Primary 6 graduating students)
+   ============================================================ */
+
+/* Work out the From-Year / To-Year / issue date for a testimonial.
+   ── LOGIC ──
+   toYear   = current year   (the year the student is completing/leaving)
+   fromYear = toYear − 6     (Primary school is a 6-year programme)
+   todayFull  = today's full date (e.g. "6 July 2026")
+   dateShort  = today's date as DD/MM/YYYY, shown inside the stamp */
+function computeTestimonialDates() {
+  const now = new Date();
+  const toYear   = now.getFullYear();
+  const fromYear = toYear - 6;
+  const todayFull  = now.toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' });
+  const dd = String(now.getDate()).padStart(2,'0');
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const dateShort = `${dd}/${mm}/${toYear}`;
+  return { fromYear, toYear, todayFull, dateShort };
+}
+
+/* Generate a scalloped red wax-seal SVG (inline markup, not a background image,
+   so it rasterizes reliably when html2canvas captures the certificate for PDF). */
+function generateSealSVG(color) {
+  color = color || '#C0272D';
+  const bumps = 20, rOuter = 46, rInner = 40, cx = 50, cy = 50;
+  const pts = [];
+  for (let i = 0; i < bumps * 2; i++) {
+    const r = (i % 2 === 0) ? rOuter : rInner;
+    const angle = (Math.PI * 2 * i) / (bumps * 2) - Math.PI / 2;
+    pts.push(`${(cx + r * Math.cos(angle)).toFixed(1)},${(cy + r * Math.sin(angle)).toFixed(1)}`);
+  }
+  return `<svg class="cert-testi-seal-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="${pts.join(' ')}" fill="${color}"/>
+  </svg>`;
+}
+
+/* Lay text out letter-by-letter along the top arc of a circle (a robust,
+   html2canvas-safe alternative to SVG textPath) — used for the curved
+   school name inside the round official stamp. radius/fontSize in px. */
+function curvedStampText(text, radius, fontSize, color) {
+  radius = radius || 44; fontSize = fontSize || 8; color = color || '#2a4d9e';
+  const chars = (text || '').split('');
+  const totalArc = Math.min(150, chars.length * 13);
+  const start = -totalArc / 2;
+  const step  = chars.length > 1 ? totalArc / (chars.length - 1) : 0;
+  const spans = chars.map((ch, i) => {
+    const angle = start + step * i;
+    return `<span style="position:absolute;left:50%;top:50%;font-size:${fontSize}px;font-weight:800;color:${color};font-family:'Manrope',sans-serif;transform:translate(-50%,-50%) rotate(${angle.toFixed(2)}deg) translateY(-${radius}px);">${escapeHtml(ch)}</span>`;
+  }).join('');
+  return `<div class="cert-testi-stamp-curved-text">${spans}</div>`;
+}
+
+/* Build the testimonial certificate HTML for one graduating Primary 6 student.
+   Flat, front-facing digital-certificate design (no paper texture/shadow) —
+   navy Greek-key border, red blackletter "Testimonial" title, school stamp
+   with curved school-name text, red scalloped seal, Head Teacher's signature.
+   The student's own "Sign:" field is always left blank for them to sign. */
+function buildTestimonialCertHTML(opts) {
+  // opts: { _id, name, classArm, admissionNo, fromYear, toYear, todayFull, dateShort }
+  const name       = opts.name || 'Unnamed Student';
+  const firstName  = name.trim().split(/\s+/)[0] || name;
+  const fromYear   = opts.fromYear;
+  const toYear     = opts.toYear;
+  const dateShort  = opts.dateShort;
+  const schoolName = SCHOOL_CONFIG.name || 'THE SCHOOL';
+  return `
+  <div class="cert-portrait-wrapper">
+  <div class="cert-testimonial" id="cert-tst-${opts._id != null ? opts._id : 'x'}">
+    <div class="cert-gk-strip-top"></div>
+    <div class="cert-gk-strip-bottom"></div>
+    <div class="cert-gk-strip-left"></div>
+    <div class="cert-gk-strip-right"></div>
+    <div class="cert-gk-corner" style="top:0;left:0;"></div>
+    <div class="cert-gk-corner" style="top:0;right:0;"></div>
+    <div class="cert-gk-corner" style="bottom:0;left:0;"></div>
+    <div class="cert-gk-corner" style="bottom:0;right:0;"></div>
+    <div class="cert-testimonial-inner">
+      <div class="cert-testi-bracket tl"></div>
+      <div class="cert-testi-bracket tr"></div>
+      <div class="cert-testi-bracket bl"></div>
+      <div class="cert-testi-bracket br"></div>
+      <div class="cert-testi-passport-mark">
+        <div class="l1"></div><div class="l2"></div>
+        <div class="txt">PASSPORT</div>
+      </div>
+      <div class="cert-testi-header-row">
+        <div class="cert-testi-school-name">${escapeHtml(schoolName)}</div>
+        ${SCHOOL_CONFIG.address ? `<div class="cert-testi-school-sub">${escapeHtml(SCHOOL_CONFIG.address)}</div>` : ''}
+      </div>
+      <div class="cert-testi-title">Testimonial</div>
+      <div class="cert-testi-title-underline"></div>
+      <div class="cert-testi-whom">To whom it may Concern</div>
+      <div class="cert-testi-certify">This is to Certify that:</div>
+      <div class="cert-testi-name">${escapeHtml(name.toUpperCase())}</div>
+      ${opts.classArm ? `<div class="cert-testi-classarm">${escapeHtml(opts.classArm)}${opts.admissionNo ? ' &nbsp;|&nbsp; Admission No: ' + escapeHtml(opts.admissionNo) : ''}</div>` : ''}
+      <div class="cert-testi-line">Has Completed His/Her Primary School Education</div>
+      <div class="cert-testi-line">From the above mentioned School</div>
+      <div class="cert-testi-yearrow">From the year: <b>${fromYear}</b> &nbsp;&nbsp; To: <b>${toYear}</b></div>
+      <div class="cert-testi-conduct">And His/Her conduct was: <b>GOOD</b> during His/Her stay in the School.</div>
+      <div class="cert-testi-namesign-row">
+        <div>Name:<span class="field-line">${escapeHtml(firstName.toUpperCase())}</span></div>
+        <div>Sign:<span class="field-line">&nbsp;</span></div>
+      </div>
+      <div class="cert-testi-seals-row">
+        <div class="cert-testi-stamp-block">
+          <div class="cert-testi-stamp-circle">
+            ${curvedStampText(schoolName.toUpperCase())}
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <img class="cert-testi-stamp-sig" src="${SCHOOL_CONFIG.headmasterSig}" alt="" onerror="this.style.display='none'">
+              <div class="cert-testi-stamp-date">DATE: ${dateShort}</div>
+            </div>
+          </div>
+          <div class="cert-testi-stamp-label">STAMP</div>
+        </div>
+        <div style="text-align:center;">
+          ${generateSealSVG()}
+        </div>
+        <div class="cert-testi-sig-block">
+          <img class="cert-testi-sig-img" src="${SCHOOL_CONFIG.headmasterSig}" alt="Head Teacher Sig" onerror="this.style.display='none'">
+          <div class="cert-testi-sig-line"></div>
+          <div class="cert-testi-sig-title">HEADTEACHERS SIGN</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>`;
+}
+
+/* Generate testimonial certificates automatically for every Primary 6 student
+   found across all Primary 6 arms (6A, 6B, 6C… — whatever exists in CLASS_LINKS). */
+async function generateTestimonialCertificates() {
+  const previewEl = $('testimonial-certs-preview');
+  if (!previewEl) return;
+  previewEl.innerHTML = '<div style="font-size:13px;color:var(--dash-muted);font-weight:700;padding:12px;">⏳ Loading Primary 6 students…</div>';
+
+  const p6Classes = Object.keys(CLASS_LINKS).filter(k => /^Primary\s*6/i.test(k));
+  if (!p6Classes.length) {
+    previewEl.innerHTML = '<div style="font-size:13px;color:#B3401F;font-weight:700;padding:12px;">⚠️ No Primary 6 class arms found in CLASS_LINKS.</div>';
+    return;
+  }
+
+  let allStudents = [];
+  for (const cls of p6Classes) {
+    const url = getTermUrl(cls, 'Third Term') || getTermUrl(cls, 'Second Term') || getTermUrl(cls, 'First Term');
+    if (!url) continue;
+    try {
+      const csv  = await fetchCSV(url);
+      const recs = parseCSV(csv);
+      recs.forEach(r => { r.__classArm = cls; });
+      allStudents = allStudents.concat(recs);
+    } catch (e) {
+      console.error('Testimonial fetch failed for', cls, e);
+    }
+  }
+
+  if (!allStudents.length) {
+    previewEl.innerHTML = '<div style="font-size:13px;color:#B3401F;font-weight:700;padding:12px;">⚠️ No student records found for Primary 6. Make sure the Primary 6 CSV links are connected and published.</div>';
+    return;
+  }
+
+  const { fromYear, toYear, todayFull, dateShort } = computeTestimonialDates();
+  previewEl.innerHTML = `<div style="font-size:12px;font-weight:800;color:var(--dash-muted);margin-bottom:14px;text-transform:uppercase;letter-spacing:.05em;">🎓 ${allStudents.length} Primary 6 Graduating Student(s) Found</div>`;
+
+  allStudents.forEach((stu, i) => {
+    const name = stu['Name'] || 'Unnamed Student';
+    const admissionNo = stu['Admission No'] || '';
+    const container = document.createElement('div');
+    container.style.marginBottom = '30px';
+    container.innerHTML =
+      buildTestimonialCertHTML({
+        _id: i,
+        name,
+        classArm: stu.__classArm,
+        admissionNo,
+        fromYear, toYear, todayFull, dateShort
+      }) +
+      `<div style="margin-top:8px;text-align:center;">
+        <button class="btn-export-pdf" style="margin-bottom:0;padding:8px 16px;font-size:12px;background:linear-gradient(135deg,#6B2E3B,#4A2530);"
+          onclick="downloadCertPDF(document.getElementById('cert-tst-${i}'), 'Testimonial_${name.replace(/\\s/g,'_')}.pdf', 'portrait')">
+          📄 Download Testimonial
+        </button>
+      </div>`;
+    previewEl.appendChild(container);
+  });
+}
+
+/* Download a cert element as a PDF. Pass orientation:'portrait' for the
+   testimonial certificate; all other certs default to 'landscape'. */
+async function downloadCertPDF(certEl, filename, orientation) {
   if (!certEl) return;
+  orientation = orientation || 'landscape';
   showToast('⏳ Generating PDF…');
   try {
     const opt = {
@@ -7926,7 +8232,7 @@ async function downloadCertPDF(certEl, filename) {
         scrollX:         0,
         scrollY:         0,
       },
-      jsPDF: { unit:'mm', format:'a4', orientation:'landscape' }
+      jsPDF: { unit:'mm', format:'a4', orientation }
     };
     await html2pdf().set(opt).from(certEl).save();
     showToast('✅ Certificate downloaded!');
@@ -8031,6 +8337,9 @@ window.generateBestStudentCertificates = generateBestStudentCertificates;
 window.generateCustomStudentCert       = generateCustomStudentCert;
 window.generateTeacherCert             = generateTeacherCert;
 window.downloadCertPDF                 = downloadCertPDF;
+window.generateTestimonialCertificates = generateTestimonialCertificates;
+window.buildTestimonialCertHTML        = buildTestimonialCertHTML;
+window.computeTestimonialDates         = computeTestimonialDates;
 
 /* ============================================================
    TERM PIN LOCK SYSTEM — Student Dashboard
