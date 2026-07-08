@@ -8595,45 +8595,50 @@ async function teacherLoadSubjectScores(term, btnEl) {
   try {
     const csv = await fetchCSV(url);
     const records = parseCSV(csv);
-    if (!records.length) {
-      wrap.innerHTML = `<p class="t-empty-note">No student records found for ${escapeHtml(term)}.</p>`;
-      return;
-    }
 
     // Case/spacing-insensitive header lookup (same technique used in renderCards)
     const normalizeHeader = h => h.replace(/\s+/g, ' ').trim().toLowerCase();
     const headerLookup = {};
-    Object.keys(records[0]).forEach(h => { headerLookup[normalizeHeader(h)] = h; });
+    if (records.length) {
+      Object.keys(records[0]).forEach(h => { headerLookup[normalizeHeader(h)] = h; });
+    }
     const getVal = (stu, suffix) => {
       const actual = headerLookup[normalizeHeader(`${teacherActiveSubject}_${suffix}`)];
-      return actual ? (parseFloat(stu[actual]) || 0) : 0;
+      return actual ? (parseFloat(stu[actual]) || 0) : null;
     };
 
     const hasSubjectColumns = ['CA1', 'CA2', 'Exams'].some(suf =>
       headerLookup[normalizeHeader(`${teacherActiveSubject}_${suf}`)]
     );
-    if (!hasSubjectColumns) {
-      wrap.innerHTML = `<p class="t-empty-note">No "${escapeHtml(teacherActiveSubject)}" score columns were found in this class's ${escapeHtml(term)} sheet.</p>`;
-      return;
+
+    let noteHtml = '';
+    if (!records.length) {
+      noteHtml = `<p class="t-empty-note">No student records found for ${escapeHtml(term)} yet — showing an empty table.</p>`;
+    } else if (!hasSubjectColumns) {
+      noteHtml = `<p class="t-empty-note">No "${escapeHtml(teacherActiveSubject)}" scores have been recorded yet for this class's ${escapeHtml(term)} sheet.</p>`;
     }
 
     const sorted = [...records].sort((a, b) => String(a['Name'] || '').localeCompare(String(b['Name'] || '')));
+    const fmt = v => (v === null || v === undefined || isNaN(v)) ? '—' : v;
     const rows = sorted.map((s, i) => {
       const ca1 = getVal(s, 'CA1'), ca2 = getVal(s, 'CA2'), exam = getVal(s, 'Exams');
-      const total = +(ca1 + ca2 + exam).toFixed(2);
+      const total = (ca1 === null && ca2 === null && exam === null)
+        ? null
+        : +((ca1 || 0) + (ca2 || 0) + (exam || 0)).toFixed(2);
       return `
         <tr>
           <td style="text-align:center;font-weight:700;">${i + 1}</td>
           <td style="font-weight:800;">${escapeHtml(s['Name'] || '—')}</td>
           <td>${escapeHtml(s['Admission No'] || '—')}</td>
-          <td style="text-align:center;">${ca1}</td>
-          <td style="text-align:center;">${ca2}</td>
-          <td style="text-align:center;">${exam}</td>
-          <td style="text-align:center;font-weight:900;color:var(--ad-indigo);">${total}</td>
+          <td style="text-align:center;">${fmt(ca1)}</td>
+          <td style="text-align:center;">${fmt(ca2)}</td>
+          <td style="text-align:center;">${fmt(exam)}</td>
+          <td style="text-align:center;font-weight:900;color:var(--ad-indigo);">${fmt(total)}</td>
         </tr>`;
     }).join('');
 
     wrap.innerHTML = `
+      ${noteHtml}
       <table class="student-list-table">
         <thead>
           <tr>
@@ -8646,7 +8651,7 @@ async function teacherLoadSubjectScores(term, btnEl) {
             <th style="text-align:center;">Total</th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rows || `<tr><td colspan="7" style="text-align:center;color:var(--dash-muted);">No students found</td></tr>`}</tbody>
       </table>`;
   } catch (e) {
     console.error(e);
