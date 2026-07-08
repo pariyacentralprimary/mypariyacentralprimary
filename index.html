@@ -646,21 +646,26 @@ body {
    Grade/Position) + right column (remaining bio-data fields) ────── */
 .rc-info-cols { display:flex; gap:0; }
 .rc-info-col-left {
-  flex:0 0 34%; display:flex; flex-direction:column;
-  border-right:1.5px solid var(--rc-navy); padding-right:12px; margin-right:12px;
+  flex:0 0 30%; display:flex; flex-direction:column;
+  border-right:1.5px solid var(--rc-navy); padding-right:8px; margin-right:8px;
+}
+.rc-info-col-mid {
+  flex:0 0 33%; display:flex; flex-direction:column;
+  border-right:1.5px solid var(--rc-navy); padding-right:8px; margin-right:8px;
 }
 .rc-info-col-right { flex:1; display:flex; flex-direction:column; min-width:0; }
 .rc-info-line {
   display:flex; justify-content:space-between; align-items:baseline;
-  gap:8px; padding:3.5px 0; font-size:13px; font-weight:800;
+  gap:4px; padding:3.5px 0; font-size:12px; font-weight:800;
 }
 .rc-info-line + .rc-info-line { border-top:1.5px solid var(--rc-navy); }
 .rc-info-line .rc-label { color:var(--rc-navy); font-weight:900; white-space:nowrap; }
 .rc-info-line .rc-value {
-  border-bottom:1px solid rgba(42,24,16,0.5); flex:1; margin-left:6px;
+  border-bottom:1px solid rgba(42,24,16,0.5); flex:1; margin-left:4px; min-width:0;
   display:inline-block; padding:0 2px; font-weight:800; color:#2A1810; text-align:center;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
-.rc-info-col-left .rc-info-line .rc-value { font-weight:900; color:var(--rc-navy); font-size:14px; }
+.rc-info-col-left .rc-info-line .rc-value { font-weight:900; color:var(--rc-navy); font-size:13px; }
 
 /* ── Blue "Academic Performance" banner ────────────────────── */
 .rc-perf-banner {
@@ -4903,6 +4908,39 @@ const RC_DEFAULT_PHOTO_SVG = `<svg viewBox="0 0 64 64" width="100%" height="100%
   <path d="M10 58c0-14 10-22 22-22s22 8 22 22" fill="#A98A6D"/>
 </svg>`;
 
+/* Lenient date parser: handles ISO ("2026-09-12"), "DD/MM/YYYY", and
+   free-text school dates like "12 Sept. 2026" or "12th September 2026". */
+function parseFlexibleDate(raw) {
+  if (!raw) return null;
+  let s = String(raw).trim();
+  if (!s) return null;
+  // Strip ordinal suffixes (1st, 2nd, 3rd, 12th ...) and trailing periods
+  // after abbreviated month names (Sept. → Sept).
+  s = s.replace(/(\d+)(st|nd|rd|th)\b/gi, '$1').replace(/([A-Za-z]{3,})\./g, '$1');
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) {
+    const d = new Date(+dmy[3], +dmy[2] - 1, +dmy[1]);
+    if (!isNaN(d)) return d;
+  }
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+/* Computes how many days a student will be on holiday between the
+   term's closing date and the next term's resumption date. Returns a
+   human-readable string, or a blank placeholder if either date is
+   missing/unparseable. */
+function calcHolidayDuration(closingRaw, resumptionRaw) {
+  const close  = parseFlexibleDate(closingRaw);
+  const resume = parseFlexibleDate(resumptionRaw);
+  if (!close || !resume) return '&nbsp;&nbsp;&nbsp;&nbsp;';
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const days = Math.round((resume - close) / msPerDay);
+  if (days <= 0) return '&nbsp;&nbsp;&nbsp;&nbsp;';
+  return `${days} Day${days === 1 ? '' : 's'}`;
+}
+
 function renderCards(container, rawStudents, formMasterOverride) {
   container.innerHTML = '';
 
@@ -5145,18 +5183,6 @@ function renderCards(container, rawStudents, formMasterOverride) {
         ? getAnnualRemark(annualGrade)
         : stu.teacherRemark;
 
-      /* Head Teacher's endorsement line — short, distinct from the
-         Class Teacher's detailed remark above it */
-      const headTeacherGrade = isThirdTerm ? annualGrade : stu.grade;
-      const headTeacherRemark = {
-        A: 'Excellent result. Approved — keep up the great work.',
-        B: 'Very good result. Approved.',
-        C: 'Good result. Approved, with room to improve.',
-        D: 'Fair result. Approved — needs closer attention.',
-        E: 'Weak result. Approved — requires extra support.',
-        F: 'Poor result. Approved — urgent intervention required.'
-      }[headTeacherGrade] || 'Approved.';
-
       /* ─── END CUSTOM EDIT SECTION — Grading box vs Annual Summary ─── */
 
       /* ─── Header contact line (only shows fields that are filled in) ─── */
@@ -5175,6 +5201,10 @@ function renderCards(container, rawStudents, formMasterOverride) {
       const dob          = escapeHtml(stu['Date of Birth'] || stu['DOB'] || '');
       const closingDate  = escapeHtml(stu['Closing Date']  || SCHOOL_CONFIG.closingDate || '');
       const categoryLabel = escapeHtml((stu.category || 'Primary').toUpperCase());
+      const holidayDuration = calcHolidayDuration(
+        stu['Closing Date'] || SCHOOL_CONFIG.closingDate,
+        stu.resumption
+      );
 
       card.innerHTML = `
         <div class="rc-header">
@@ -5203,16 +5233,19 @@ function renderCards(container, rawStudents, formMasterOverride) {
               <div class="rc-info-line"><span class="rc-label">Grade:</span><span class="rc-value">${escapeHtml(String(stu.grade))}</span></div>
               <div class="rc-info-line"><span class="rc-label">Position:</span><span class="rc-value"><span class="pos-plain" style="font-size:12px;display:inline;">${escapeHtml(String(stu._pos))}/${totalInClass}</span></span></div>
             </div>
-            <div class="rc-info-col-right">
-              <div class="rc-info-line"><span class="rc-label">Class:</span><span class="rc-value">${escapeHtml(stu.classType)} (${escapeHtml(stu.classSection)})</span></div>
+            <div class="rc-info-col-mid">
               <div class="rc-info-line"><span class="rc-label">Gender:</span><span class="rc-value">${escapeHtml(stu['Gender']||'-')}</span></div>
-              <div class="rc-info-line"><span class="rc-label">Term:</span><span class="rc-value">${escapeHtml(stu.term)}</span></div>
-              <div class="rc-info-line"><span class="rc-label">Session:</span><span class="rc-value">${escapeHtml(stu.session)}</span></div>
-              <div class="rc-info-line"><span class="rc-label">No in Class:</span><span class="rc-value">${totalInClass}</span></div>
-              <div class="rc-info-line"><span class="rc-label">Date of Birth:</span><span class="rc-value">${dob || '&nbsp;&nbsp;&nbsp;&nbsp;'}</span></div>
               <div class="rc-info-line"><span class="rc-label">Admission No:</span><span class="rc-value rc-adm-value">${escapeHtml(stu['Admission No']||'-')}</span></div>
+              <div class="rc-info-line"><span class="rc-label">Class:</span><span class="rc-value">${escapeHtml(stu.classType)} (${escapeHtml(stu.classSection)})</span></div>
+              <div class="rc-info-line"><span class="rc-label">No in Class:</span><span class="rc-value">${totalInClass}</span></div>
+              <div class="rc-info-line"><span class="rc-label">Term:</span><span class="rc-value">${escapeHtml(stu.term)}</span></div>
+            </div>
+            <div class="rc-info-col-right">
+              <div class="rc-info-line"><span class="rc-label">Session:</span><span class="rc-value">${escapeHtml(stu.session)}</span></div>
+              <div class="rc-info-line"><span class="rc-label">Date of Birth:</span><span class="rc-value">${dob || '&nbsp;&nbsp;&nbsp;&nbsp;'}</span></div>
               <div class="rc-info-line"><span class="rc-label">Closing Date:</span><span class="rc-value">${closingDate || '&nbsp;&nbsp;&nbsp;&nbsp;'}</span></div>
               <div class="rc-info-line"><span class="rc-label">Resumption Date:</span><span class="rc-value">${escapeHtml(stu.resumption)}</span></div>
+              <div class="rc-info-line"><span class="rc-label">Holiday Duration:</span><span class="rc-value">${holidayDuration}</span></div>
             </div>
           </div>
         </div>
@@ -5242,7 +5275,6 @@ function renderCards(container, rawStudents, formMasterOverride) {
 
         <div class="rc-remarks-box">
           <div class="rc-remark-line"><span class="rc-label">Class Teacher's Remark:</span>${escapeHtml(remarkText)}</div>
-          <div class="rc-remark-line"><span class="rc-label">Head Teacher's Remark:</span>${escapeHtml(headTeacherRemark)}</div>
           <div class="bottom-row">
             <div class="signature-block">
               ${formMasterSigHtml}
