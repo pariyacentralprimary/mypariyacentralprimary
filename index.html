@@ -9865,7 +9865,7 @@ function catRenderHome() {
   let totalClasses = 0, totalDone = 0, totalAll = 0;
 
   const groups = {
-    '📚 Primary':          ['Primary 1','Primary 2','Primary 3','Primary 4','Primary 5','Primary 6'],
+    '📚 Primary':          Object.keys(CLASS_LINKS),
   };
 
   for (const [groupName, classNames] of Object.entries(groups)) {
@@ -9982,7 +9982,7 @@ function catCopySingleClassReport(className) {
    CA TRACKER — Section 2: CA & Exams Management Dashboard
    ============================================================ */
 const CA2_SCHOOL_GROUPS = {
-  'nursery-primary': ['Primary 1','Primary 2','Primary 3','Primary 4','Primary 5','Primary 6']
+  'nursery-primary': Object.keys(CLASS_LINKS)
 };
 
 let ca2ActiveTerm   = 'first';
