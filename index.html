@@ -2588,6 +2588,9 @@ canvas.pa-chart {
         <button class="ad-sb-item" onclick="switchTab('tab-masterlist');setAdActive(this);renderMasterListGrid();" title="Master List">
           <i class="fa-solid fa-list-check"></i> 🗂️ Master List
         </button>
+        <button class="ad-sb-item" onclick="switchTab('tab-teacher-directory');setAdActive(this);loadTeacherDirectory();" title="Teacher Directory">
+          <i class="fa-solid fa-chalkboard-user"></i> 👩‍🏫 Teachers
+        </button>
 
         <div class="ad-sb-section" style="margin-top:10px;">Analytics</div>
         <button class="ad-sb-item" onclick="switchTab('tab-analytics');setAdActive(this)">
@@ -2708,6 +2711,9 @@ canvas.pa-chart {
           <button class="ad-tab-btn" onclick="switchTab('tab-masterlist');setAdTab(this);renderMasterListGrid();">
             <i class="fa-solid fa-list-check"></i> Master List
           </button>
+          <button class="ad-tab-btn" onclick="switchTab('tab-teacher-directory');setAdTab(this);loadTeacherDirectory();">
+            <i class="fa-solid fa-chalkboard-user"></i> Teachers
+          </button>
           <button class="ad-tab-btn" onclick="switchTab('tab-websites');setAdTab(this)">
             <i class="fa-solid fa-globe"></i> Websites
           </button>
@@ -2791,6 +2797,45 @@ canvas.pa-chart {
                 <div class="spinner"></div>
                 <span>Generating document…</span>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── TEACHER DIRECTORY TAB ── -->
+        <div id="tab-teacher-directory" class="tab-panel">
+          <div class="ad-card">
+            <div class="ad-card-header">
+              <div class="ad-card-title">
+                <i class="fa-solid fa-chalkboard-user"></i> Teacher Directory
+              </div>
+              <div style="font-size:12px;color:var(--ad-ink3);">
+                Full teacher list synced from Google Sheets — classes &amp; subjects, letter-headed for download or print.
+              </div>
+            </div>
+            <div class="ad-card-body">
+              <div class="class-detail-toolbar">
+                <input type="text" class="class-search-input" id="teacherDirSearch"
+                       placeholder="🔍 Search by name, phone, ID, class or subject…"
+                       oninput="filterTeacherDirectory()">
+                <button class="btn-report btn-report-outline" onclick="loadTeacherDirectory(true)">
+                  <i class="fa-solid fa-rotate"></i> Refresh
+                </button>
+                <button class="btn-report btn-report-primary" onclick="downloadTeacherDirectoryPDF()">
+                  <i class="fa-solid fa-file-pdf"></i> Download PDF
+                </button>
+                <button class="btn-report btn-report-outline" onclick="printTeacherDirectoryDoc()">
+                  <i class="fa-solid fa-print"></i> Print
+                </button>
+              </div>
+
+              <div id="teacherdir-loading" class="loading-bar" style="margin-top:0;margin-bottom:12px;">
+                <div class="spinner"></div>
+                <span>Fetching teacher data…</span>
+              </div>
+
+              <div id="teacherDirStats" style="font-size:12px;font-weight:700;color:var(--ad-ink3);margin-bottom:10px;"></div>
+
+              <div class="student-list-table-wrap" id="teacherDirTableWrap"></div>
             </div>
           </div>
         </div>
@@ -7651,6 +7696,288 @@ async function printPositionListDoc(className) {
   }
 }
 /* END CUSTOM EDIT SECTION — Master List */
+
+/* ============================================================
+   START CUSTOM EDIT SECTION — Teacher Directory
+   Purpose: Full teacher list synced from a Google Sheet CSV
+   (columns: TeacherID, Name, Phone, Address, email, Primary 1,
+   Primary 2, Primary 3, Primary 4, Primary 5, Primary 6 — the
+   "Primary N" columns hold the subject(s) that teacher takes in
+   that class, comma-separated e.g. "English Language, Mathematics").
+   Letter-headed, downloadable and printable.
+   ============================================================ */
+
+// 👉 PASTE YOUR TEACHER DIRECTORY GOOGLE SHEET CSV LINK HERE:
+const TEACHER_DIRECTORY_CSV_URL = "PASTE_YOUR_TEACHER_DIRECTORY_CSV_LINK_HERE";
+
+let teacherDirectoryData    = [];   // raw parsed rows
+let teacherDirectoryReady   = [];   // rows enriched with classesTaught[]
+let teacherDirLoadedOnce    = false;
+
+/** Quote-aware CSV parser — handles cells with embedded commas
+    like "English Language, Mathematics" when wrapped in quotes. */
+function parseCSVLineQuoted(line) {
+  const cols = [];
+  let cur = '', inQ = false;
+  for (let c = 0; c < line.length; c++) {
+    const ch = line[c];
+    if (ch === '"') { inQ = !inQ; }
+    else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ''; }
+    else cur += ch;
+  }
+  cols.push(cur.trim());
+  return cols.map(v => v.replace(/^"|"$/g, '').trim());
+}
+
+function parseTeacherDirectoryCSV(csv) {
+  const lines = csv.split(/\r?\n/).filter(l => l.trim() !== '');
+  if (lines.length < 2) return [];
+  const headers = parseCSVLineQuoted(lines[0]);
+  const records = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLineQuoted(lines[i]);
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = (cols[idx] || '').trim(); });
+    const hasIdentity = (obj['TeacherID'] || obj['Teacher ID'] || obj['Name'] || '').trim();
+    if (hasIdentity) records.push(obj);
+  }
+  return records;
+}
+
+/** Reads a teacher row's "Primary N" columns and returns only the
+    classes/subjects that teacher actually teaches. */
+function getTeacherClassesTaught(t) {
+  const out = [];
+  Object.keys(t).forEach(h => {
+    const m = h.trim().match(/^primary\s*([1-6])$/i);
+    if (!m) return;
+    const raw = (t[h] || '').trim();
+    if (!raw) return;
+    const subjects = raw.split(',').map(s => s.trim()).filter(Boolean);
+    if (subjects.length) out.push({ className: `Primary ${m[1]}`, subjects });
+  });
+  out.sort((a, b) => a.className.localeCompare(b.className, undefined, { numeric: true }));
+  return out;
+}
+
+function setTeacherDirLoading(on) {
+  const loader = $('teacherdir-loading');
+  if (!loader) return;
+  loader.classList.toggle('visible', !!on);
+}
+
+async function loadTeacherDirectory(force) {
+  if (teacherDirLoadedOnce && !force) { renderTeacherDirectoryTable(); return; }
+  if (!TEACHER_DIRECTORY_CSV_URL || TEACHER_DIRECTORY_CSV_URL.indexOf('PASTE_YOUR') === 0) {
+    $('teacherDirTableWrap').innerHTML =
+      '<p style="font-size:13px;color:var(--ad-ink3);font-weight:600;padding:20px 0;text-align:center;">' +
+      '⚠️ No Teacher Directory CSV link has been added yet.<br>' +
+      '<span style="font-size:11px;">Paste the Google Sheet CSV publish link into <code>TEACHER_DIRECTORY_CSV_URL</code> in the code.</span></p>';
+    return;
+  }
+  setTeacherDirLoading(true);
+  try {
+    const csv = await fetchCSV(TEACHER_DIRECTORY_CSV_URL);
+    teacherDirectoryData = parseTeacherDirectoryCSV(csv);
+    teacherDirectoryReady = teacherDirectoryData.map(t => ({
+      TeacherID: t['TeacherID'] || t['Teacher ID'] || '—',
+      Name:      t['Name'] || '—',
+      Phone:     t['Phone'] || '—',
+      Address:   t['Address'] || '—',
+      Email:     t['email'] || t['Email'] || '—',
+      classes:   getTeacherClassesTaught(t)
+    }));
+    teacherDirLoadedOnce = true;
+    if (!teacherDirectoryReady.length) {
+      showToast('⚠️ Teacher Directory sheet loaded but appears empty.', 'error');
+    } else {
+      showToast(`✅ ${teacherDirectoryReady.length} teacher(s) loaded.`);
+    }
+    renderTeacherDirectoryTable();
+  } catch (e) {
+    console.error(e);
+    showToast('⚠️ Could not load Teacher Directory. Check the CSV link or connection.', 'error');
+    $('teacherDirTableWrap').innerHTML =
+      '<p style="font-size:13px;color:var(--ad-ink3);font-weight:600;padding:20px 0;text-align:center;">❌ Could not load teacher data.</p>';
+  } finally {
+    setTeacherDirLoading(false);
+  }
+}
+
+/** Renders the classes/subjects a teacher takes as small badge groups. */
+function renderTeacherClassesHtml(classes) {
+  if (!classes.length) return '<span style="color:var(--ad-ink3);font-size:11.5px;">— No classes assigned —</span>';
+  return classes.map(c => `
+    <div style="margin-bottom:4px;">
+      <span class="badge-tag blue" style="margin-right:5px;">${escapeHtml(c.className)}</span>
+      ${c.subjects.map(s => `<span class="badge-tag">${escapeHtml(s)}</span>`).join(' ')}
+    </div>`).join('');
+}
+
+function getFilteredTeacherDirectory() {
+  const q = ($('teacherDirSearch') && $('teacherDirSearch').value || '').trim().toLowerCase();
+  if (!q) return teacherDirectoryReady;
+  return teacherDirectoryReady.filter(t => {
+    const classText = t.classes.map(c => c.className + ' ' + c.subjects.join(' ')).join(' ').toLowerCase();
+    return t.TeacherID.toLowerCase().includes(q) ||
+           t.Name.toLowerCase().includes(q) ||
+           t.Phone.toLowerCase().includes(q) ||
+           t.Email.toLowerCase().includes(q) ||
+           classText.includes(q);
+  });
+}
+
+function filterTeacherDirectory() { renderTeacherDirectoryTable(); }
+
+function renderTeacherDirectoryTable() {
+  const wrap = $('teacherDirTableWrap');
+  const stats = $('teacherDirStats');
+  if (!wrap) return;
+  const list = getFilteredTeacherDirectory();
+
+  if (stats) {
+    stats.textContent = teacherDirectoryReady.length
+      ? `Showing ${list.length} of ${teacherDirectoryReady.length} teacher(s)`
+      : '';
+  }
+
+  if (!list.length) {
+    wrap.innerHTML = teacherDirectoryReady.length
+      ? '<p style="font-size:13px;color:var(--ad-ink3);font-weight:600;padding:20px 0;text-align:center;">No teachers match your search.</p>'
+      : '<p style="font-size:13px;color:var(--ad-ink3);font-weight:600;padding:20px 0;text-align:center;">No teacher data loaded yet.</p>';
+    return;
+  }
+
+  const rows = list.map((t, i) => `
+    <tr>
+      <td style="text-align:center;font-weight:700;">${i + 1}</td>
+      <td style="font-weight:800;color:var(--ad-indigo);">${escapeHtml(t.TeacherID)}</td>
+      <td style="font-weight:800;">${escapeHtml(t.Name)}</td>
+      <td>${escapeHtml(t.Phone)}</td>
+      <td>${escapeHtml(t.Email)}</td>
+      <td>${escapeHtml(t.Address)}</td>
+      <td>${renderTeacherClassesHtml(t.classes)}</td>
+    </tr>`).join('');
+
+  wrap.innerHTML = `
+    <table class="student-list-table">
+      <thead>
+        <tr>
+          <th style="text-align:center;">#</th>
+          <th>Teacher ID</th>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Email</th>
+          <th>Address</th>
+          <th>Classes &amp; Subjects Teaching</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+/** Builds the letter-headed table HTML (for PDF download / print) listing
+    every teacher currently matching the active search filter. */
+function buildTeacherDirectoryPdfTableHtml(list) {
+  const rows = list.map((t, i) => {
+    const classesText = t.classes.length
+      ? t.classes.map(c => `${c.className}: ${c.subjects.join(', ')}`).join('<br>')
+      : '—';
+    return `
+    <tr style="background:${i % 2 === 0 ? '#fff' : '#FBF6EC'};">
+      <td style="padding:8px 10px;border:1px solid #F1E2C9;font-weight:700;">${i + 1}</td>
+      <td style="padding:8px 10px;border:1px solid #F1E2C9;font-weight:800;color:#5C3317;">${escapeHtml(t.TeacherID)}</td>
+      <td style="padding:8px 10px;border:1px solid #F1E2C9;font-weight:800;color:#3D2314;">${escapeHtml(t.Name)}</td>
+      <td style="padding:8px 10px;border:1px solid #F1E2C9;">${escapeHtml(t.Phone)}</td>
+      <td style="padding:8px 10px;border:1px solid #F1E2C9;">${escapeHtml(t.Email)}</td>
+      <td style="padding:8px 10px;border:1px solid #F1E2C9;">${escapeHtml(t.Address)}</td>
+      <td style="padding:8px 10px;border:1px solid #F1E2C9;font-size:11px;">${classesText}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:10px;">
+      <thead>
+        <tr style="background:#5C3317;color:#fff;">
+          <th style="padding:9px 8px;border:1px solid #3D2314;text-align:left;font-size:10.5px;text-transform:uppercase;">#</th>
+          <th style="padding:9px 8px;border:1px solid #3D2314;text-align:left;font-size:10.5px;text-transform:uppercase;">Teacher ID</th>
+          <th style="padding:9px 8px;border:1px solid #3D2314;text-align:left;font-size:10.5px;text-transform:uppercase;">Name</th>
+          <th style="padding:9px 8px;border:1px solid #3D2314;text-align:left;font-size:10.5px;text-transform:uppercase;">Phone</th>
+          <th style="padding:9px 8px;border:1px solid #3D2314;text-align:left;font-size:10.5px;text-transform:uppercase;">Email</th>
+          <th style="padding:9px 8px;border:1px solid #3D2314;text-align:left;font-size:10.5px;text-transform:uppercase;">Address</th>
+          <th style="padding:9px 8px;border:1px solid #3D2314;text-align:left;font-size:10.5px;text-transform:uppercase;">Classes &amp; Subjects</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr style="background:#FBF6EC;">
+          <td colspan="7" style="padding:8px 10px;border:1px solid #F1E2C9;font-weight:900;color:#5C3317;text-align:right;">
+            Total Teachers: ${list.length}
+          </td>
+        </tr>
+      </tfoot>
+    </table>`;
+}
+
+async function downloadTeacherDirectoryPDF() {
+  const list = getFilteredTeacherDirectory();
+  if (!list.length) {
+    showToast('❌ No teacher data to export yet.', 'error');
+    return;
+  }
+  setTeacherDirLoading(true);
+  showToast('⏳ Generating Teacher Directory PDF…');
+  try {
+    const tableHtml = buildTeacherDirectoryPdfTableHtml(list);
+    const html = buildLetterPdfHtml(
+      'Teacher Directory',
+      `Total: ${list.length} teacher(s) | Session: ${SCHOOL_CONFIG.session}`,
+      tableHtml
+    );
+    const el = mountLetterTemplate(html);
+    await html2pdf().set(letterPdfOptions('Pariya_Primary_Teacher_Directory.pdf')).from(el).save();
+    unmountLetterTemplate(el);
+    showToast('✅ Teacher Directory downloaded!');
+  } catch (e) {
+    console.error(e);
+    showToast('❌ Could not generate Teacher Directory PDF.', 'error');
+  } finally {
+    setTeacherDirLoading(false);
+  }
+}
+
+async function printTeacherDirectoryDoc() {
+  const list = getFilteredTeacherDirectory();
+  if (!list.length) {
+    showToast('❌ No teacher data to print yet.', 'error');
+    return;
+  }
+  setTeacherDirLoading(true);
+  showToast('⏳ Preparing Teacher Directory for print…');
+  try {
+    const tableHtml = buildTeacherDirectoryPdfTableHtml(list);
+    const html = buildLetterPdfHtml(
+      'Teacher Directory',
+      `Total: ${list.length} teacher(s) | Session: ${SCHOOL_CONFIG.session}`,
+      tableHtml
+    );
+    const pc = $('printContainer');
+    pc.innerHTML = html;
+    setTimeout(() => {
+      try { window.print(); }
+      catch (err) {
+        console.error('window.print() failed:', err);
+        showToast('❌ Could not open the print dialog.', 'error');
+      }
+    }, 400);
+  } catch (e) {
+    console.error(e);
+    showToast('❌ Could not prepare the print view.', 'error');
+  } finally {
+    setTeacherDirLoading(false);
+  }
+}
+/* END CUSTOM EDIT SECTION — Teacher Directory */
 
 /* ============================================================
    START CUSTOM EDIT SECTION — Download Teachers PDF
