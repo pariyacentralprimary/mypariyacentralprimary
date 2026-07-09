@@ -2560,7 +2560,7 @@ canvas.pa-chart {
       </div>
       <div class="copyright-footer">
         © <span>2026 Pariya Central Primary</span>. All Rights Reserved.<br>
-        Designed by <span>Arabo Modibbo</span>
+        Developed by <span>Arabo Modibbo</span>
       </div>
     </div>
   </div>
@@ -2592,7 +2592,7 @@ canvas.pa-chart {
     </div>
   </div>
   <div class="copyright-footer">
-    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Designed by <span>Arabo Modibbo</span>
+    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Developed by <span>Arabo Modibbo</span>
   </div>
 </div>
 
@@ -2630,7 +2630,7 @@ canvas.pa-chart {
     </div>
   </div>
   <div class="copyright-footer">
-    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Designed by <span>Arabo Modibbo</span>
+    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Developed by <span>Arabo Modibbo</span>
   </div>
 </div>
 
@@ -2666,7 +2666,7 @@ canvas.pa-chart {
     </div>
   </div>
   <div class="copyright-footer">
-    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Designed by <span>Arabo Modibbo</span>
+    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Developed by <span>Arabo Modibbo</span>
   </div>
 </div>
 
@@ -3484,7 +3484,7 @@ canvas.pa-chart {
                 <span style="font-size:13px;font-weight:800;color:var(--dash-accent);">v3.2</span>
               </div>
               <div class="settings-row">
-                <div><div class="settings-row-label">Designed By</div><div class="settings-row-sub">Full-stack developer</div></div>
+                <div><div class="settings-row-label">Developed By</div><div class="settings-row-sub">Full-stack developer</div></div>
                 <span style="font-size:13px;font-weight:800;color:var(--dash-accent);">Arabo Modibbo</span>
               </div>
             </div>
@@ -3494,7 +3494,7 @@ canvas.pa-chart {
       </div><!-- end ad-content -->
 
       <div class="copyright-footer">
-        © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Designed by <span>Arabo Modibbo</span>
+        © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Developed by <span>Arabo Modibbo</span>
       </div>
     </div><!-- end ad-main -->
   </div><!-- end ad-shell -->
@@ -3588,7 +3588,7 @@ canvas.pa-chart {
     </main>
 
     <div class="copyright-footer">
-      © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Designed by <span>Arabo Modibbo</span>
+      © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Developed by <span>Arabo Modibbo</span>
     </div>
   </div>
 </div>
@@ -3811,7 +3811,7 @@ canvas.pa-chart {
         </div>
 
         <div class="sd-footer">
-          © 2026 Pariya Central Primary. All Rights Reserved. Designed by <strong style="color:var(--sd-ink2);">Arabo Modibbo</strong>
+          © 2026 Pariya Central Primary. All Rights Reserved. Developed by <strong style="color:var(--sd-ink2);">Arabo Modibbo</strong>
         </div>
 
       </div><!-- end sd-content -->
@@ -4117,7 +4117,7 @@ canvas.pa-chart {
     </div>
   </div>
   <div class="copyright-footer">
-    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Designed by <span>Arabo Modibbo</span>
+    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Developed by <span>Arabo Modibbo</span>
   </div>
 </div>
 <!-- END CUSTOM EDIT SECTION — Student Fees Blocked Screen -->
@@ -4348,6 +4348,22 @@ let analyticsCache = {};        // Cache for analytics data per class
 
 /* Shorthand for document.getElementById */
 const $ = id => document.getElementById(id);
+
+/* Extract a subject's display/lookup name from one of its score column
+   headers (e.g. "Social_Studies_CA1" → "Social_Studies", "Mathematics_Exams"
+   → "Mathematics"). FIX: this used to be `header.split('_')[0]`, which only
+   kept the text before the FIRST underscore. Any subject whose own name
+   contains an underscore (e.g. "Social_Studies_CA1", "Basic_Science_CA2",
+   "Islamic_Religious_Studies_Exams") was being cut down to just its first
+   word ("Social", "Basic", "Islamic"), and the column lookups that
+   reconstructed "<name>_CA1" etc. from that truncated name no longer
+   matched the real header — so the subject's scores never appeared on the
+   report card or in the teacher's subject list. Stripping only the known
+   trailing suffix (_CA1/_CA2/_CA3/_Exams) keeps the rest of the subject
+   name intact so lookups keep matching the original header exactly. */
+function subjectNameFromHeader(header) {
+  return header.replace(/_(CA[123]|Exams)$/i, '').trim();
+}
 
 /* ============================================================
    SCREEN NAVIGATION
@@ -5086,7 +5102,7 @@ async function enrichWithTermAverages(students, className) {
     const subjects = [...new Set(
       headers
         .filter(h => h.includes('_CA') || h.includes('_Exams'))
-        .map(h => h.split('_')[0])
+        .map(h => subjectNameFromHeader(h))
     )];
     if (!subjects.length) return null;
     let totalMarks = 0, subjectCount = 0;
@@ -5389,7 +5405,7 @@ function renderCards(container, rawStudents, formMasterOverride) {
   const seenSubjects = new Map(); // normalized subject name -> display name
   allHeaders.forEach(h => {
     if (h.includes('_CA') || h.includes('_Exams')) {
-      const rawName = h.split('_')[0];
+      const rawName = subjectNameFromHeader(h);
       const key = normalizeHeader(rawName);
       if (!seenSubjects.has(key)) seenSubjects.set(key, rawName.trim());
     }
@@ -6009,7 +6025,7 @@ function computeAnalytics(records, className) {
 
   const headers  = Object.keys(records[0]);
   const subjects = [...new Set(
-    headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => h.split('_')[0])
+    headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => subjectNameFromHeader(h))
   )];
 
   let maleCount = 0, femaleCount = 0;
@@ -6093,7 +6109,7 @@ async function computeStudentAnnualAvg(className) {
     if (!row) return null;
     const headers = Object.keys(row);
     const subjects = [...new Set(
-      headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => h.split('_')[0])
+      headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => subjectNameFromHeader(h))
     )];
     if (!subjects.length) return null;
     let total = 0, count = 0;
@@ -6338,7 +6354,7 @@ async function computeTermAvg(url) {
     if (!records.length) return null;
     const headers  = Object.keys(records[0]);
     const subjects = [...new Set(
-      headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => h.split('_')[0])
+      headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => subjectNameFromHeader(h))
     )];
     let sumAvg = 0, count = 0;
     records.forEach(stu => {
@@ -6469,7 +6485,7 @@ function buildAnalyticsExportHTML(format) {
     '</table>' +
 
     '<p style="font-size:10px;color:#6B5645;margin-top:24px;border-top:1px solid #F1E2C9;padding-top:8px;">' +
-      'Report generated by Pariya Central Primary Report Card System. Designed by Arabo Modibbo.' +
+      'Report generated by Pariya Central Primary Report Card System. Developed by Arabo Modibbo.' +
     '</p>';
   return div;
 }
@@ -7766,7 +7782,7 @@ function computeClassRanking(rawStudents) {
   const seenSubjects = new Map();
   allHeaders.forEach(h => {
     if (h.includes('_CA') || h.includes('_Exams')) {
-      const rawName = h.split('_')[0];
+      const rawName = subjectNameFromHeader(h);
       const key = normalizeHeader(rawName);
       if (!seenSubjects.has(key)) seenSubjects.set(key, rawName.trim());
     }
@@ -9924,7 +9940,7 @@ async function catLoadAllData() {
         const h = header.toUpperCase().trim();
         let type = h.includes('CA1') ? 'CA1' : h.includes('CA2') ? 'CA2' : h.includes('CA3') ? 'CA3' : h.includes('EXAM') ? 'Exam' : '';
         if (type) {
-          const sName = header.split('_')[0].trim();
+          const sName = subjectNameFromHeader(header);
           if (!subjects[sName]) subjects[sName] = { CA1:null, CA2:null, CA3:null, Exam:null };
           let filled = false;
           for (let r = 0; r < dataRows.length; r++) {
@@ -10158,7 +10174,7 @@ async function ca2OpenClass(className) {
       const h = header.toUpperCase().trim();
       let type = h.includes('CA1') ? 'CA1' : h.includes('CA2') ? 'CA2' : h.includes('CA3') ? 'CA3' : h.includes('EXAM') ? 'Exam' : '';
       if (type) {
-        const sName = header.split('_')[0].trim();
+        const sName = subjectNameFromHeader(header);
         if (!subjects[sName]) subjects[sName] = { CA1:null, CA2:null, CA3:null, Exam:null };
         let filled = false;
         for (let r = 0; r < dataRows.length; r++) {
