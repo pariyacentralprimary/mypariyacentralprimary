@@ -2560,7 +2560,7 @@ canvas.pa-chart {
       </div>
       <div class="copyright-footer">
         © <span>2026 Pariya Central Primary</span>. All Rights Reserved.<br>
-        Developed by <span>Arabo Modibbo</span>
+        Designed by <span>Arabo Modibbo</span>
       </div>
     </div>
   </div>
@@ -2592,7 +2592,7 @@ canvas.pa-chart {
     </div>
   </div>
   <div class="copyright-footer">
-    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Developed by <span>Arabo Modibbo</span>
+    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Designed by <span>Arabo Modibbo</span>
   </div>
 </div>
 
@@ -2630,7 +2630,7 @@ canvas.pa-chart {
     </div>
   </div>
   <div class="copyright-footer">
-    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Developed by <span>Arabo Modibbo</span>
+    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Designed by <span>Arabo Modibbo</span>
   </div>
 </div>
 
@@ -2666,7 +2666,7 @@ canvas.pa-chart {
     </div>
   </div>
   <div class="copyright-footer">
-    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Developed by <span>Arabo Modibbo</span>
+    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Designed by <span>Arabo Modibbo</span>
   </div>
 </div>
 
@@ -3484,7 +3484,7 @@ canvas.pa-chart {
                 <span style="font-size:13px;font-weight:800;color:var(--dash-accent);">v3.2</span>
               </div>
               <div class="settings-row">
-                <div><div class="settings-row-label">Developed By</div><div class="settings-row-sub">Full-stack developer</div></div>
+                <div><div class="settings-row-label">Designed By</div><div class="settings-row-sub">Full-stack developer</div></div>
                 <span style="font-size:13px;font-weight:800;color:var(--dash-accent);">Arabo Modibbo</span>
               </div>
             </div>
@@ -3494,7 +3494,7 @@ canvas.pa-chart {
       </div><!-- end ad-content -->
 
       <div class="copyright-footer">
-        © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Developed by <span>Arabo Modibbo</span>
+        © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Designed by <span>Arabo Modibbo</span>
       </div>
     </div><!-- end ad-main -->
   </div><!-- end ad-shell -->
@@ -3588,7 +3588,7 @@ canvas.pa-chart {
     </main>
 
     <div class="copyright-footer">
-      © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Developed by <span>Arabo Modibbo</span>
+      © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Designed by <span>Arabo Modibbo</span>
     </div>
   </div>
 </div>
@@ -3811,7 +3811,7 @@ canvas.pa-chart {
         </div>
 
         <div class="sd-footer">
-          © 2026 Pariya Central Primary. All Rights Reserved. Developed by <strong style="color:var(--sd-ink2);">Arabo Modibbo</strong>
+          © 2026 Pariya Central Primary. All Rights Reserved. Designed by <strong style="color:var(--sd-ink2);">Arabo Modibbo</strong>
         </div>
 
       </div><!-- end sd-content -->
@@ -4117,7 +4117,7 @@ canvas.pa-chart {
     </div>
   </div>
   <div class="copyright-footer">
-    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Developed by <span>Arabo Modibbo</span>
+    © <span>2026 Pariya Central Primary</span>. All Rights Reserved. Designed by <span>Arabo Modibbo</span>
   </div>
 </div>
 <!-- END CUSTOM EDIT SECTION — Student Fees Blocked Screen -->
@@ -4348,49 +4348,6 @@ let analyticsCache = {};        // Cache for analytics data per class
 
 /* Shorthand for document.getElementById */
 const $ = id => document.getElementById(id);
-
-/* Extract a subject's canonical display name from one of its score column
-   headers — e.g. "Agriculture_CA1", "Agriculture _Exams" (note the stray
-   space before the underscore that real spreadsheets often have on only
-   SOME of a subject's columns), and "Mathematics_CA1 " (trailing space)
-   all resolve to the same clean name "Agriculture" / "Mathematics".
-   Collapsing all whitespace around the underscore and at the edges is
-   what makes this tolerant of that kind of messy, inconsistent spacing. */
-function subjectNameFromHeader(header) {
-  return header
-    .replace(/\s*_\s*(CA[123]|Exams)\s*$/i, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/* Build a canonical subject -> column-header map from a row/sheet's header
-   list, e.g. { "agriculture": { display:"Agriculture", CA1:"Agriculture_CA1",
-   CA2:"Agriculture_CA2", CA3:null, Exams:"Agriculture _Exams" }, ... }.
-   FIX: several places used to reconstruct a header string like
-   `${subjectName}_CA1` and look that up directly. That only works if the
-   spacing around every subject's underscore is perfectly consistent across
-   all of its CA1/CA2/CA3/Exams columns. Real sheets often aren't (e.g.
-   "Agriculture_CA1" but "Agriculture _Exams" for the very same subject),
-   so the reconstructed string silently failed to match the real column and
-   that subject's score came back as 0/blank. Scanning the actual headers
-   once up front and mapping each one to its real header key removes the
-   guesswork entirely. */
-function buildSubjectColumnMap(headers) {
-  const map = {};
-  headers.forEach(h => {
-    const m = h.match(/^(.*?)\s*_\s*(CA[123]|Exams)\s*$/i);
-    if (!m) return;
-    const display = m[1].replace(/\s+/g, ' ').trim();
-    if (!display) return;
-    const key = display.toLowerCase();
-    const suffixRaw = m[2].toLowerCase();
-    const suffix = suffixRaw === 'exams' ? 'Exams' : 'CA' + suffixRaw.slice(2);
-    if (!map[key]) map[key] = { display, CA1: null, CA2: null, CA3: null, Exams: null };
-    map[key][suffix] = h;
-  });
-  return map;
-}
-
 
 /* ============================================================
    SCREEN NAVIGATION
@@ -5126,16 +5083,18 @@ async function enrichWithTermAverages(students, className) {
     }
     // 2. Compute from subject totals (same logic as renderCards)
     const headers = Object.keys(row);
-    const subjectColMap = buildSubjectColumnMap(headers);
-    const subjectKeys = Object.keys(subjectColMap);
-    if (!subjectKeys.length) return null;
+    const subjects = [...new Set(
+      headers
+        .filter(h => h.includes('_CA') || h.includes('_Exams'))
+        .map(h => h.split('_')[0])
+    )];
+    if (!subjects.length) return null;
     let totalMarks = 0, subjectCount = 0;
-    subjectKeys.forEach(key => {
-      const cols = subjectColMap[key];
-      const s1   = parseFloat(cols.CA1   ? row[cols.CA1]   : 0) || 0;
-      const s2   = parseFloat(cols.CA2   ? row[cols.CA2]   : 0) || 0;
-      const s3   = parseFloat(cols.CA3   ? row[cols.CA3]   : 0) || 0;
-      const exam = parseFloat(cols.Exams ? row[cols.Exams] : 0) || 0;
+    subjects.forEach(sub => {
+      const s1   = parseFloat(row[`${sub}_CA1`])   || 0;
+      const s2   = parseFloat(row[`${sub}_CA2`])   || 0;
+      const s3   = parseFloat(row[`${sub}_CA3`])   || 0;
+      const exam = parseFloat(row[`${sub}_Exams`]) || 0;
       totalMarks += s1 + s2 + s3 + exam;
       subjectCount++;
     });
@@ -5414,24 +5373,33 @@ function calcHolidayDuration(closingRaw, resumptionRaw) {
 function renderCards(container, rawStudents, formMasterOverride) {
   container.innerHTML = '';
 
-  // Detect subjects from column headers (e.g. "Mathematics_CA1" → "Mathematics").
-  // FIX: subjects used to be found/looked-up by reconstructing a header
-  // string like `${subjectName}_CA1` and hoping it matched exactly. Real
-  // sheets often have inconsistent spacing around the underscore across a
-  // single subject's own CA1/CA2/CA3/Exams columns (e.g. "Agriculture_CA1"
-  // but "Agriculture _Exams"), which made that reconstruction miss the real
-  // column and show 0/blank for that subject. buildSubjectColumnMap scans
-  // the real headers once and maps each subject straight to its actual
-  // column keys, so lookups always hit the right column.
+  // Detect subjects from column headers (e.g. "Mathematics_CA1" → "Mathematics")
   const allHeaders = Object.keys(rawStudents[0]);
-  const subjectColMap = buildSubjectColumnMap(allHeaders);
-  const subjects = Object.values(subjectColMap).map(v => v.display);
+
+  // FIX: a subject was showing up twice on the printed report whenever its
+  // CA1/CA2/CA3/Exams columns weren't spelled identically (e.g. "Mathematics_CA1"
+  // vs "mathematics_CA2", or an extra space) — each spelling created its own
+  // Set entry. We now group headers by a normalized (trimmed, single-spaced,
+  // lower-cased) subject name, and keep a lookup back to the ACTUAL header
+  // text so score values are still read correctly for every column.
+  const normalizeHeader = h => h.replace(/\s+/g, ' ').trim().toLowerCase();
+  const headerLookup = {};
+  allHeaders.forEach(h => { headerLookup[normalizeHeader(h)] = h; });
+
+  const seenSubjects = new Map(); // normalized subject name -> display name
+  allHeaders.forEach(h => {
+    if (h.includes('_CA') || h.includes('_Exams')) {
+      const rawName = h.split('_')[0];
+      const key = normalizeHeader(rawName);
+      if (!seenSubjects.has(key)) seenSubjects.set(key, rawName.trim());
+    }
+  });
+  const subjects = [...seenSubjects.values()];
 
   // Look up a subject's score column regardless of minor case/spacing
   // differences between its CA1/CA2/CA3/Exams header variants.
   const getSubjVal = (stu, sub, suffix) => {
-    const entry = subjectColMap[sub.toLowerCase()];
-    const actualHeader = entry ? entry[suffix] : null;
+    const actualHeader = headerLookup[normalizeHeader(`${sub}_${suffix}`)];
     return actualHeader ? (stu[actualHeader] || 0) : 0;
   };
 
@@ -6040,8 +6008,9 @@ function computeAnalytics(records, className) {
   if (!records || !records.length) return null;
 
   const headers  = Object.keys(records[0]);
-  const subjectColMap = buildSubjectColumnMap(headers);
-  const subjects = Object.keys(subjectColMap); // canonical keys, used with subjectColMap below
+  const subjects = [...new Set(
+    headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => h.split('_')[0])
+  )];
 
   let maleCount = 0, femaleCount = 0;
   let passCount = 0, failCount = 0;
@@ -6056,12 +6025,11 @@ function computeAnalytics(records, className) {
 
     const mode = getScoringMode(stu['Class Category'] || 'Primary');
     let total = 0, count = 0;
-    subjects.forEach(key => {
-      const cols = subjectColMap[key];
-      total += (+(cols.CA1   ? stu[cols.CA1]   : 0) || 0) +
-               (+(cols.CA2   ? stu[cols.CA2]   : 0) || 0) +
-               (mode.isJssSs ? (+(cols.CA3 ? stu[cols.CA3] : 0) || 0) : 0) +
-               (+(cols.Exams ? stu[cols.Exams] : 0) || 0);
+    subjects.forEach(sub => {
+      total += (+stu[sub + '_CA1']   || 0) +
+               (+stu[sub + '_CA2']   || 0) +
+               (mode.isJssSs ? (+stu[sub + '_CA3'] || 0) : 0) +
+               (+stu[sub + '_Exams'] || 0);
       count++;
     });
     const avg = count ? +(total / count).toFixed(2) : 0;
@@ -6124,14 +6092,13 @@ async function computeStudentAnnualAvg(className) {
   function extractStudentAvg(row) {
     if (!row) return null;
     const headers = Object.keys(row);
-    const subjectColMap = buildSubjectColumnMap(headers);
-    const subjectKeys = Object.keys(subjectColMap);
-    if (!subjectKeys.length) return null;
+    const subjects = [...new Set(
+      headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => h.split('_')[0])
+    )];
+    if (!subjects.length) return null;
     let total = 0, count = 0;
-    subjectKeys.forEach(key => {
-      const cols = subjectColMap[key];
-      total += (+(cols.CA1 ? row[cols.CA1] : 0)||0)+(+(cols.CA2 ? row[cols.CA2] : 0)||0)+
-               (+(cols.CA3 ? row[cols.CA3] : 0)||0)+(+(cols.Exams ? row[cols.Exams] : 0)||0);
+    subjects.forEach(sub => {
+      total += (+row[sub+'_CA1']||0)+(+row[sub+'_CA2']||0)+(+row[sub+'_CA3']||0)+(+row[sub+'_Exams']||0);
       count++;
     });
     return count ? +(total / count).toFixed(2) : null;
@@ -6370,16 +6337,16 @@ async function computeTermAvg(url) {
     const records = parseCSV(csv);
     if (!records.length) return null;
     const headers  = Object.keys(records[0]);
-    const subjectColMap = buildSubjectColumnMap(headers);
-    const subjects = Object.keys(subjectColMap);
+    const subjects = [...new Set(
+      headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => h.split('_')[0])
+    )];
     let sumAvg = 0, count = 0;
     records.forEach(stu => {
       const mode  = getScoringMode(stu['Class Category'] || 'Primary');
       let total = 0, sc = 0;
-      subjects.forEach(key => {
-        const cols = subjectColMap[key];
-        total += (+(cols.CA1 ? stu[cols.CA1] : 0) || 0) + (+(cols.CA2 ? stu[cols.CA2] : 0) || 0) +
-                 (mode.isJssSs ? (+(cols.CA3 ? stu[cols.CA3] : 0) || 0) : 0) + (+(cols.Exams ? stu[cols.Exams] : 0) || 0);
+      subjects.forEach(sub => {
+        total += (+stu[sub + '_CA1'] || 0) + (+stu[sub + '_CA2'] || 0) +
+                 (mode.isJssSs ? (+stu[sub + '_CA3'] || 0) : 0) + (+stu[sub + '_Exams'] || 0);
         sc++;
       });
       if (sc) { sumAvg += total / sc; count++; }
@@ -6502,7 +6469,7 @@ function buildAnalyticsExportHTML(format) {
     '</table>' +
 
     '<p style="font-size:10px;color:#6B5645;margin-top:24px;border-top:1px solid #F1E2C9;padding-top:8px;">' +
-      'Report generated by Pariya Central Primary Report Card System. Developed by Arabo Modibbo.' +
+      'Report generated by Pariya Central Primary Report Card System. Designed by Arabo Modibbo.' +
     '</p>';
   return div;
 }
@@ -7792,13 +7759,23 @@ async function fetchBestAvailableStudents(className) {
 function computeClassRanking(rawStudents) {
   if (!rawStudents.length) return [];
   const allHeaders = Object.keys(rawStudents[0]);
-  const subjectColMap = buildSubjectColumnMap(allHeaders);
-  const subjects = Object.values(subjectColMap).map(v => v.display);
+  const normalizeHeader = h => h.replace(/\s+/g, ' ').trim().toLowerCase();
+  const headerLookup = {};
+  allHeaders.forEach(h => { headerLookup[normalizeHeader(h)] = h; });
+
+  const seenSubjects = new Map();
+  allHeaders.forEach(h => {
+    if (h.includes('_CA') || h.includes('_Exams')) {
+      const rawName = h.split('_')[0];
+      const key = normalizeHeader(rawName);
+      if (!seenSubjects.has(key)) seenSubjects.set(key, rawName.trim());
+    }
+  });
+  const subjects = [...seenSubjects.values()];
   if (!subjects.length) return [];
 
   const getSubjVal = (stu, sub, suffix) => {
-    const entry = subjectColMap[sub.toLowerCase()];
-    const actualHeader = entry ? entry[suffix] : null;
+    const actualHeader = headerLookup[normalizeHeader(`${sub}_${suffix}`)];
     return actualHeader ? (stu[actualHeader] || 0) : 0;
   };
 
@@ -9947,7 +9924,7 @@ async function catLoadAllData() {
         const h = header.toUpperCase().trim();
         let type = h.includes('CA1') ? 'CA1' : h.includes('CA2') ? 'CA2' : h.includes('CA3') ? 'CA3' : h.includes('EXAM') ? 'Exam' : '';
         if (type) {
-          const sName = subjectNameFromHeader(header);
+          const sName = header.split('_')[0].trim();
           if (!subjects[sName]) subjects[sName] = { CA1:null, CA2:null, CA3:null, Exam:null };
           let filled = false;
           for (let r = 0; r < dataRows.length; r++) {
@@ -10181,7 +10158,7 @@ async function ca2OpenClass(className) {
       const h = header.toUpperCase().trim();
       let type = h.includes('CA1') ? 'CA1' : h.includes('CA2') ? 'CA2' : h.includes('CA3') ? 'CA3' : h.includes('EXAM') ? 'Exam' : '';
       if (type) {
-        const sName = subjectNameFromHeader(header);
+        const sName = header.split('_')[0].trim();
         if (!subjects[sName]) subjects[sName] = { CA1:null, CA2:null, CA3:null, Exam:null };
         let filled = false;
         for (let r = 0; r < dataRows.length; r++) {
