@@ -4349,21 +4349,48 @@ let analyticsCache = {};        // Cache for analytics data per class
 /* Shorthand for document.getElementById */
 const $ = id => document.getElementById(id);
 
-/* Extract a subject's display/lookup name from one of its score column
-   headers (e.g. "Social_Studies_CA1" → "Social_Studies", "Mathematics_Exams"
-   → "Mathematics"). FIX: this used to be `header.split('_')[0]`, which only
-   kept the text before the FIRST underscore. Any subject whose own name
-   contains an underscore (e.g. "Social_Studies_CA1", "Basic_Science_CA2",
-   "Islamic_Religious_Studies_Exams") was being cut down to just its first
-   word ("Social", "Basic", "Islamic"), and the column lookups that
-   reconstructed "<name>_CA1" etc. from that truncated name no longer
-   matched the real header — so the subject's scores never appeared on the
-   report card or in the teacher's subject list. Stripping only the known
-   trailing suffix (_CA1/_CA2/_CA3/_Exams) keeps the rest of the subject
-   name intact so lookups keep matching the original header exactly. */
+/* Extract a subject's canonical display name from one of its score column
+   headers — e.g. "Agriculture_CA1", "Agriculture _Exams" (note the stray
+   space before the underscore that real spreadsheets often have on only
+   SOME of a subject's columns), and "Mathematics_CA1 " (trailing space)
+   all resolve to the same clean name "Agriculture" / "Mathematics".
+   Collapsing all whitespace around the underscore and at the edges is
+   what makes this tolerant of that kind of messy, inconsistent spacing. */
 function subjectNameFromHeader(header) {
-  return header.replace(/_(CA[123]|Exams)$/i, '').trim();
+  return header
+    .replace(/\s*_\s*(CA[123]|Exams)\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
+
+/* Build a canonical subject -> column-header map from a row/sheet's header
+   list, e.g. { "agriculture": { display:"Agriculture", CA1:"Agriculture_CA1",
+   CA2:"Agriculture_CA2", CA3:null, Exams:"Agriculture _Exams" }, ... }.
+   FIX: several places used to reconstruct a header string like
+   `${subjectName}_CA1` and look that up directly. That only works if the
+   spacing around every subject's underscore is perfectly consistent across
+   all of its CA1/CA2/CA3/Exams columns. Real sheets often aren't (e.g.
+   "Agriculture_CA1" but "Agriculture _Exams" for the very same subject),
+   so the reconstructed string silently failed to match the real column and
+   that subject's score came back as 0/blank. Scanning the actual headers
+   once up front and mapping each one to its real header key removes the
+   guesswork entirely. */
+function buildSubjectColumnMap(headers) {
+  const map = {};
+  headers.forEach(h => {
+    const m = h.match(/^(.*?)\s*_\s*(CA[123]|Exams)\s*$/i);
+    if (!m) return;
+    const display = m[1].replace(/\s+/g, ' ').trim();
+    if (!display) return;
+    const key = display.toLowerCase();
+    const suffixRaw = m[2].toLowerCase();
+    const suffix = suffixRaw === 'exams' ? 'Exams' : 'CA' + suffixRaw.slice(2);
+    if (!map[key]) map[key] = { display, CA1: null, CA2: null, CA3: null, Exams: null };
+    map[key][suffix] = h;
+  });
+  return map;
+}
+
 
 /* ============================================================
    SCREEN NAVIGATION
@@ -5099,18 +5126,16 @@ async function enrichWithTermAverages(students, className) {
     }
     // 2. Compute from subject totals (same logic as renderCards)
     const headers = Object.keys(row);
-    const subjects = [...new Set(
-      headers
-        .filter(h => h.includes('_CA') || h.includes('_Exams'))
-        .map(h => subjectNameFromHeader(h))
-    )];
-    if (!subjects.length) return null;
+    const subjectColMap = buildSubjectColumnMap(headers);
+    const subjectKeys = Object.keys(subjectColMap);
+    if (!subjectKeys.length) return null;
     let totalMarks = 0, subjectCount = 0;
-    subjects.forEach(sub => {
-      const s1   = parseFloat(row[`${sub}_CA1`])   || 0;
-      const s2   = parseFloat(row[`${sub}_CA2`])   || 0;
-      const s3   = parseFloat(row[`${sub}_CA3`])   || 0;
-      const exam = parseFloat(row[`${sub}_Exams`]) || 0;
+    subjectKeys.forEach(key => {
+      const cols = subjectColMap[key];
+      const s1   = parseFloat(cols.CA1   ? row[cols.CA1]   : 0) || 0;
+      const s2   = parseFloat(cols.CA2   ? row[cols.CA2]   : 0) || 0;
+      const s3   = parseFloat(cols.CA3   ? row[cols.CA3]   : 0) || 0;
+      const exam = parseFloat(cols.Exams ? row[cols.Exams] : 0) || 0;
       totalMarks += s1 + s2 + s3 + exam;
       subjectCount++;
     });
@@ -5389,33 +5414,24 @@ function calcHolidayDuration(closingRaw, resumptionRaw) {
 function renderCards(container, rawStudents, formMasterOverride) {
   container.innerHTML = '';
 
-  // Detect subjects from column headers (e.g. "Mathematics_CA1" → "Mathematics")
+  // Detect subjects from column headers (e.g. "Mathematics_CA1" → "Mathematics").
+  // FIX: subjects used to be found/looked-up by reconstructing a header
+  // string like `${subjectName}_CA1` and hoping it matched exactly. Real
+  // sheets often have inconsistent spacing around the underscore across a
+  // single subject's own CA1/CA2/CA3/Exams columns (e.g. "Agriculture_CA1"
+  // but "Agriculture _Exams"), which made that reconstruction miss the real
+  // column and show 0/blank for that subject. buildSubjectColumnMap scans
+  // the real headers once and maps each subject straight to its actual
+  // column keys, so lookups always hit the right column.
   const allHeaders = Object.keys(rawStudents[0]);
-
-  // FIX: a subject was showing up twice on the printed report whenever its
-  // CA1/CA2/CA3/Exams columns weren't spelled identically (e.g. "Mathematics_CA1"
-  // vs "mathematics_CA2", or an extra space) — each spelling created its own
-  // Set entry. We now group headers by a normalized (trimmed, single-spaced,
-  // lower-cased) subject name, and keep a lookup back to the ACTUAL header
-  // text so score values are still read correctly for every column.
-  const normalizeHeader = h => h.replace(/\s+/g, ' ').trim().toLowerCase();
-  const headerLookup = {};
-  allHeaders.forEach(h => { headerLookup[normalizeHeader(h)] = h; });
-
-  const seenSubjects = new Map(); // normalized subject name -> display name
-  allHeaders.forEach(h => {
-    if (h.includes('_CA') || h.includes('_Exams')) {
-      const rawName = subjectNameFromHeader(h);
-      const key = normalizeHeader(rawName);
-      if (!seenSubjects.has(key)) seenSubjects.set(key, rawName.trim());
-    }
-  });
-  const subjects = [...seenSubjects.values()];
+  const subjectColMap = buildSubjectColumnMap(allHeaders);
+  const subjects = Object.values(subjectColMap).map(v => v.display);
 
   // Look up a subject's score column regardless of minor case/spacing
   // differences between its CA1/CA2/CA3/Exams header variants.
   const getSubjVal = (stu, sub, suffix) => {
-    const actualHeader = headerLookup[normalizeHeader(`${sub}_${suffix}`)];
+    const entry = subjectColMap[sub.toLowerCase()];
+    const actualHeader = entry ? entry[suffix] : null;
     return actualHeader ? (stu[actualHeader] || 0) : 0;
   };
 
@@ -6024,9 +6040,8 @@ function computeAnalytics(records, className) {
   if (!records || !records.length) return null;
 
   const headers  = Object.keys(records[0]);
-  const subjects = [...new Set(
-    headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => subjectNameFromHeader(h))
-  )];
+  const subjectColMap = buildSubjectColumnMap(headers);
+  const subjects = Object.keys(subjectColMap); // canonical keys, used with subjectColMap below
 
   let maleCount = 0, femaleCount = 0;
   let passCount = 0, failCount = 0;
@@ -6041,11 +6056,12 @@ function computeAnalytics(records, className) {
 
     const mode = getScoringMode(stu['Class Category'] || 'Primary');
     let total = 0, count = 0;
-    subjects.forEach(sub => {
-      total += (+stu[sub + '_CA1']   || 0) +
-               (+stu[sub + '_CA2']   || 0) +
-               (mode.isJssSs ? (+stu[sub + '_CA3'] || 0) : 0) +
-               (+stu[sub + '_Exams'] || 0);
+    subjects.forEach(key => {
+      const cols = subjectColMap[key];
+      total += (+(cols.CA1   ? stu[cols.CA1]   : 0) || 0) +
+               (+(cols.CA2   ? stu[cols.CA2]   : 0) || 0) +
+               (mode.isJssSs ? (+(cols.CA3 ? stu[cols.CA3] : 0) || 0) : 0) +
+               (+(cols.Exams ? stu[cols.Exams] : 0) || 0);
       count++;
     });
     const avg = count ? +(total / count).toFixed(2) : 0;
@@ -6108,13 +6124,14 @@ async function computeStudentAnnualAvg(className) {
   function extractStudentAvg(row) {
     if (!row) return null;
     const headers = Object.keys(row);
-    const subjects = [...new Set(
-      headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => subjectNameFromHeader(h))
-    )];
-    if (!subjects.length) return null;
+    const subjectColMap = buildSubjectColumnMap(headers);
+    const subjectKeys = Object.keys(subjectColMap);
+    if (!subjectKeys.length) return null;
     let total = 0, count = 0;
-    subjects.forEach(sub => {
-      total += (+row[sub+'_CA1']||0)+(+row[sub+'_CA2']||0)+(+row[sub+'_CA3']||0)+(+row[sub+'_Exams']||0);
+    subjectKeys.forEach(key => {
+      const cols = subjectColMap[key];
+      total += (+(cols.CA1 ? row[cols.CA1] : 0)||0)+(+(cols.CA2 ? row[cols.CA2] : 0)||0)+
+               (+(cols.CA3 ? row[cols.CA3] : 0)||0)+(+(cols.Exams ? row[cols.Exams] : 0)||0);
       count++;
     });
     return count ? +(total / count).toFixed(2) : null;
@@ -6353,16 +6370,16 @@ async function computeTermAvg(url) {
     const records = parseCSV(csv);
     if (!records.length) return null;
     const headers  = Object.keys(records[0]);
-    const subjects = [...new Set(
-      headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => subjectNameFromHeader(h))
-    )];
+    const subjectColMap = buildSubjectColumnMap(headers);
+    const subjects = Object.keys(subjectColMap);
     let sumAvg = 0, count = 0;
     records.forEach(stu => {
       const mode  = getScoringMode(stu['Class Category'] || 'Primary');
       let total = 0, sc = 0;
-      subjects.forEach(sub => {
-        total += (+stu[sub + '_CA1'] || 0) + (+stu[sub + '_CA2'] || 0) +
-                 (mode.isJssSs ? (+stu[sub + '_CA3'] || 0) : 0) + (+stu[sub + '_Exams'] || 0);
+      subjects.forEach(key => {
+        const cols = subjectColMap[key];
+        total += (+(cols.CA1 ? stu[cols.CA1] : 0) || 0) + (+(cols.CA2 ? stu[cols.CA2] : 0) || 0) +
+                 (mode.isJssSs ? (+(cols.CA3 ? stu[cols.CA3] : 0) || 0) : 0) + (+(cols.Exams ? stu[cols.Exams] : 0) || 0);
         sc++;
       });
       if (sc) { sumAvg += total / sc; count++; }
@@ -7775,23 +7792,13 @@ async function fetchBestAvailableStudents(className) {
 function computeClassRanking(rawStudents) {
   if (!rawStudents.length) return [];
   const allHeaders = Object.keys(rawStudents[0]);
-  const normalizeHeader = h => h.replace(/\s+/g, ' ').trim().toLowerCase();
-  const headerLookup = {};
-  allHeaders.forEach(h => { headerLookup[normalizeHeader(h)] = h; });
-
-  const seenSubjects = new Map();
-  allHeaders.forEach(h => {
-    if (h.includes('_CA') || h.includes('_Exams')) {
-      const rawName = subjectNameFromHeader(h);
-      const key = normalizeHeader(rawName);
-      if (!seenSubjects.has(key)) seenSubjects.set(key, rawName.trim());
-    }
-  });
-  const subjects = [...seenSubjects.values()];
+  const subjectColMap = buildSubjectColumnMap(allHeaders);
+  const subjects = Object.values(subjectColMap).map(v => v.display);
   if (!subjects.length) return [];
 
   const getSubjVal = (stu, sub, suffix) => {
-    const actualHeader = headerLookup[normalizeHeader(`${sub}_${suffix}`)];
+    const entry = subjectColMap[sub.toLowerCase()];
+    const actualHeader = entry ? entry[suffix] : null;
     return actualHeader ? (stu[actualHeader] || 0) : 0;
   };
 
