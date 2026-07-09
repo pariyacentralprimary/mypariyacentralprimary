@@ -1068,6 +1068,13 @@ body {
   body > #printContainer { display:block !important; }
   body > #tt-print-mount  { display:block !important; }
 
+  /* Testimonial certificates printed via Print All — one per page */
+  #printContainer .cert-print-page {
+    display:flex !important; justify-content:center; align-items:flex-start;
+    page-break-after:always !important; margin:0 !important;
+  }
+  #printContainer .cert-print-page:last-child { page-break-after:avoid !important; }
+
   .card {
     margin:0 !important; padding:6mm !important;
     page-break-after:always !important;
@@ -2480,7 +2487,7 @@ canvas.pa-chart {
     <!-- Left Hero (desktop only) -->
     <div class="login-hero">
       <div class="login-hero-content">
-        <img class="login-hero-logo" src="https://i.postimg.cc/VvMcYqbb/LOGO.png" alt="Logo" onerror="this.style.display='none'">
+        <img class="login-hero-logo" src="https://i.postimg.cc/qq1DrzQt/download.png" alt="Logo" onerror="this.style.display='none'">
         <div class="login-hero-title">Pariya Central Primary<br>Report Card System</div>
         <div class="login-hero-sub">Do not be sad</div>
         <div class="hero-stat-cards">
@@ -2498,7 +2505,7 @@ canvas.pa-chart {
         <div class="login-card" style="max-width:420px;width:100%;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
             <div class="login-logo-wrap" style="margin-bottom:0;">
-              <img id="portalLogoImg" src="https://i.postimg.cc/VvMcYqbb/LOGO.png" alt="School Logo" onerror="this.style.opacity='0'" style="width:52px;height:52px;">
+              <img id="portalLogoImg" src="https://i.postimg.cc/qq1DrzQt/download.png" alt="School Logo" onerror="this.style.opacity='0'" style="width:52px;height:52px;">
             </div>
             <button class="theme-toggle-btn" onclick="toggleTheme()" id="login-theme-btn" title="Toggle theme">🌙</button>
           </div>
@@ -2566,7 +2573,7 @@ canvas.pa-chart {
   <div class="login-wrap">
     <div class="login-card">
       <div class="login-logo-wrap">
-        <img src="https://i.postimg.cc/VvMcYqbb/LOGO.png" alt="School Logo" onerror="this.style.opacity='0'">
+        <img src="https://i.postimg.cc/qq1DrzQt/download.png" alt="School Logo" onerror="this.style.opacity='0'">
       </div>
       <div class="login-school">
         <h1>Admin Portal</h1>
@@ -2596,7 +2603,7 @@ canvas.pa-chart {
   <div class="login-wrap">
     <div class="login-card">
       <div class="login-logo-wrap">
-        <img src="https://i.postimg.cc/VvMcYqbb/LOGO.png" alt="School Logo" onerror="this.style.opacity='0'">
+        <img src="https://i.postimg.cc/qq1DrzQt/download.png" alt="School Logo" onerror="this.style.opacity='0'">
       </div>
       <div class="login-school">
         <h1>Student Portal</h1>
@@ -2634,7 +2641,7 @@ canvas.pa-chart {
   <div class="login-wrap">
     <div class="login-card">
       <div class="login-logo-wrap">
-        <img src="https://i.postimg.cc/VvMcYqbb/LOGO.png" alt="School Logo" onerror="this.style.opacity='0'">
+        <img src="https://i.postimg.cc/qq1DrzQt/download.png" alt="School Logo" onerror="this.style.opacity='0'">
       </div>
       <div class="login-school">
         <h1>Teacher Portal</h1>
@@ -2674,11 +2681,10 @@ canvas.pa-chart {
       <div class="ad-sb-brand">
         <div class="ad-sb-logo-row">
           <div class="ad-sb-logo">
-            <img src="https://i.postimg.cc/VvMcYqbb/LOGO.png" alt="Logo" onerror="this.parentElement.innerHTML='P'">
+            <img src="https://i.postimg.cc/qq1DrzQt/download.png" alt="Logo" onerror="this.parentElement.innerHTML='P'">
           </div>
           <div>
             <div class="ad-sb-school">Pariya Central Primary</div>
-            <div class="ad-sb-tagline">For Modern Science &amp; Quran</div>
           </div>
         </div>
       </div>
@@ -3254,7 +3260,11 @@ canvas.pa-chart {
             <p style="font-size:12px;color:var(--dash-muted);font-weight:600;margin-bottom:16px;max-width:560px;">
               Automatically generates a testimonial certificate for every Primary 6 student (all arms) found in their class sheet — for students who have completed and are graduating from Primary School. Student's signature is left blank for them to sign; the Head Teacher's signature and school stamp are added automatically.
             </p>
-            <button class="btn-export-pdf" style="background:linear-gradient(135deg,#6B2E3B,#4A2530);" onclick="generateTestimonialCertificates()">🎓 Generate Testimonial Certificates</button>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;">
+              <button class="btn-export-pdf" style="background:linear-gradient(135deg,#6B2E3B,#4A2530);" onclick="generateTestimonialCertificates()">🎓 Generate Testimonial Certificates</button>
+              <button class="btn-export-pdf" style="background:linear-gradient(135deg,#1F5B3A,#173F29);" onclick="downloadAllTestimonials()">📥 Download All (One PDF)</button>
+              <button class="btn-export-pdf" style="background:linear-gradient(135deg,#1E3A5F,#142642);" onclick="printAllTestimonials()">🖨️ Print All</button>
+            </div>
             <div id="testimonial-certs-preview" style="margin-top:16px;"></div>
           </div>
         </div>
@@ -3498,7 +3508,7 @@ canvas.pa-chart {
     <nav class="ad-topbar" style="position:sticky;">
       <div class="ad-topbar-left">
         <div class="ad-sb-logo" style="width:30px;height:30px;">
-          <img src="https://i.postimg.cc/VvMcYqbb/LOGO.png" alt="Logo" onerror="this.parentElement.innerHTML='P'">
+          <img src="https://i.postimg.cc/qq1DrzQt/download.png" alt="Logo" onerror="this.parentElement.innerHTML='P'">
         </div>
         <div>
           <div class="ad-page-eyebrow">Class Detail</div>
@@ -3595,11 +3605,10 @@ canvas.pa-chart {
       <div class="sd-sb-brand">
         <div class="sd-sb-logo-row">
           <div class="sd-sb-logo">
-            <img src="https://i.postimg.cc/VvMcYqbb/LOGO.png" alt="Logo" onerror="this.parentElement.innerHTML='P'">
+            <img src="https://i.postimg.cc/qq1DrzQt/download.png" alt="Logo" onerror="this.parentElement.innerHTML='P'">
           </div>
           <div>
             <div class="sd-sb-school">Pariya Central Primary</div>
-            <div class="sd-sb-tagline">For Modern Science &amp; Quran</div>
           </div>
         </div>
       </div>
@@ -3822,11 +3831,10 @@ canvas.pa-chart {
       <div class="ad-sb-brand">
         <div class="ad-sb-logo-row">
           <div class="ad-sb-logo">
-            <img src="https://i.postimg.cc/VvMcYqbb/LOGO.png" alt="Logo" onerror="this.parentElement.innerHTML='P'">
+            <img src="https://i.postimg.cc/qq1DrzQt/download.png" alt="Logo" onerror="this.parentElement.innerHTML='P'">
           </div>
           <div>
             <div class="ad-sb-school">Pariya Central Primary</div>
-            <div class="ad-sb-tagline">For Modern Science &amp; Quran</div>
           </div>
         </div>
       </div>
@@ -4148,7 +4156,7 @@ canvas.pa-chart {
    ============================================================ */
 const SCHOOL_CONFIG = {
   name:             "PARIYA CENTRAL PRIMARY SCHOOL",
-  motto:            "Do not be sad",
+  motto:            "Unity & Faith, Peace & Progress",
   address:          "Opposite Govt Junior Secondary School",
   primaryWebsite:   "https://mypariyacentralprimary.netlify.app",
   secondaryWebsite: "https://mypariyacentralprimary.netlify.app",
@@ -4158,7 +4166,7 @@ const SCHOOL_CONFIG = {
   phone:       "",
 
   // ── Logo image (use PostImage direct links) ──
-  schoolLogo:  "https://i.postimg.cc/VvMcYqbb/LOGO.png",
+  schoolLogo:  "https://i.postimg.cc/qq1DrzQt/download.png",
 
   // ── Academic info ──
   session:     "2025/2026",
@@ -9572,6 +9580,22 @@ async function generateTestimonialCertificates() {
   });
 }
 
+/* Wait for every <img> inside a node to finish loading (or fail) before we
+   rasterize it with html2canvas. Remote images (PostImage logo/signature
+   links etc.) load asynchronously — capturing before they resolve is what
+   was causing certificates to export blank or fail to download at all. */
+function waitForImages(root) {
+  const imgs = Array.from(root.querySelectorAll('img'));
+  if (!imgs.length) return Promise.resolve();
+  return Promise.all(imgs.map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      img.addEventListener('load',  resolve, { once:true });
+      img.addEventListener('error', resolve, { once:true });
+    });
+  }));
+}
+
 /* Download a cert element as a PDF. Pass orientation:'portrait' for the
    testimonial certificate; all other certs default to 'landscape'. */
 async function downloadCertPDF(certEl, filename, orientation) {
@@ -9579,6 +9603,7 @@ async function downloadCertPDF(certEl, filename, orientation) {
   orientation = orientation || 'landscape';
   showToast('⏳ Generating PDF…');
   try {
+    await waitForImages(certEl);
     const opt = {
       margin:      [6,6,6,6],
       filename,
@@ -9599,6 +9624,73 @@ async function downloadCertPDF(certEl, filename, orientation) {
   } catch(e) {
     console.error(e);
     showToast('❌ PDF failed. Try again.', 'error');
+  }
+}
+
+/* Download every generated testimonial certificate as one combined,
+   multi-page PDF (one certificate per page). */
+async function downloadAllTestimonials() {
+  const certs = document.querySelectorAll('#testimonial-certs-preview .cert-testimonial');
+  if (!certs.length) {
+    showToast('⚠️ No testimonials to download. Click "Generate Testimonial Certificates" first.', 'error');
+    return;
+  }
+  showToast(`⏳ Preparing ${certs.length} testimonial(s)…`);
+  try {
+    await Promise.all(Array.from(certs).map(waitForImages));
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const margin = 6, pageW = 210, pageH = 297;
+    const cW = pageW - margin * 2, cH = pageH - margin * 2;
+
+    for (let i = 0; i < certs.length; i++) {
+      const canvas = await html2canvas(certs[i], {
+        scale: 2, useCORS: true, allowTaint: true, logging: false,
+        backgroundColor: '#ffffff'
+      });
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
+      const ratio = Math.min(cW / (canvas.width / 3.78), cH / (canvas.height / 3.78));
+      const drawW = (canvas.width / 3.78) * ratio;
+      const drawH = (canvas.height / 3.78) * ratio;
+      if (i > 0) doc.addPage();
+      doc.addImage(imgData, 'JPEG', margin + (cW - drawW) / 2, margin + (cH - drawH) / 2, drawW, drawH);
+    }
+    doc.save('Pariya_Primary_All_Testimonials.pdf');
+    showToast('✅ All testimonials downloaded!');
+  } catch (err) {
+    console.error('downloadAllTestimonials failed:', err);
+    showToast('❌ Bulk download failed. Try downloading them individually instead.', 'error');
+  }
+}
+
+/* Print every generated testimonial certificate — one certificate per
+   printed page — using the shared #printContainer print pipeline. */
+async function printAllTestimonials() {
+  const wrappers = document.querySelectorAll('#testimonial-certs-preview .cert-portrait-wrapper');
+  if (!wrappers.length) {
+    showToast('⚠️ No testimonials to print. Click "Generate Testimonial Certificates" first.', 'error');
+    return;
+  }
+  showToast('⏳ Preparing print view…');
+  try {
+    await Promise.all(Array.from(wrappers).map(waitForImages));
+    const pc = $('printContainer');
+    pc.innerHTML = '';
+    wrappers.forEach(w => {
+      const clone = w.cloneNode(true);
+      clone.classList.add('cert-print-page');
+      pc.appendChild(clone);
+    });
+    setTimeout(() => {
+      try { window.print(); }
+      catch (err) {
+        console.error('window.print() failed:', err);
+        showToast('❌ Could not open the print dialog.', 'error');
+      }
+    }, 500);
+  } catch (err) {
+    console.error('printAllTestimonials failed:', err);
+    showToast('❌ Could not prepare the print view. See console for details.', 'error');
   }
 }
 
@@ -9700,6 +9792,8 @@ window.downloadCertPDF                 = downloadCertPDF;
 window.generateTestimonialCertificates = generateTestimonialCertificates;
 window.buildTestimonialCertHTML        = buildTestimonialCertHTML;
 window.computeTestimonialDates         = computeTestimonialDates;
+window.downloadAllTestimonials         = downloadAllTestimonials;
+window.printAllTestimonials            = printAllTestimonials;
 
 /* ============================================================
    TERM PIN LOCK SYSTEM — Student Dashboard
