@@ -3851,9 +3851,6 @@ canvas.pa-chart {
         <button class="ad-sb-item" onclick="switchTeacherTab('t-tab-myclasses');setTeacherSbActive(this);teacherResetMyClassesView();">
           <i class="fa-solid fa-chalkboard"></i> 📚 My Classes
         </button>
-        <button class="ad-sb-item" onclick="switchTeacherTab('t-tab-masterlist');setTeacherSbActive(this);renderTeacherMasterListGrid();">
-          <i class="fa-solid fa-list-ol"></i> 📋 Master List
-        </button>
       </nav>
 
       <div class="ad-sb-bottom">
@@ -4044,22 +4041,6 @@ canvas.pa-chart {
             </div>
           </div>
 
-        </div>
-
-        <!-- ══ TAB: MASTER LIST ══ -->
-        <div id="t-tab-masterlist" class="t-tab-panel">
-          <div class="ad-card">
-            <div class="ad-card-header">
-              <div class="ad-card-title"><i class="fa-solid fa-list-ol"></i> Master List</div>
-              <div style="font-size:12px;color:var(--ad-ink3);">Roster for the classes you teach — in the same order as the school sheet</div>
-            </div>
-            <div class="ad-card-body">
-              <div id="teacher-masterlist-loading" class="loading-bar" style="display:none;">
-                <div class="spinner"></div><span>Generating document…</span>
-              </div>
-              <div class="ad-class-grid" id="teacherMasterListGrid"></div>
-            </div>
-          </div>
         </div>
 
       </div>
@@ -4620,10 +4601,9 @@ function studentLoadTerm(term) {
       // ── STEP 5: Stamp the correct Term onto every student in the class ──
       const classStudentsWithTerm = classStudents.map(s => ({ ...s, Term: term }));
 
-      // ── Annual Summary fix: fetch 1st term avg for Second Term, and
-      //    1st + 2nd term averages for Third Term ──
-      if (term === 'Second Term' || term === 'Third Term') {
-        await enrichWithTermAverages(classStudentsWithTerm, studentLoginData.className, term);
+      // ── Annual Summary fix: fetch 1st & 2nd term averages for Third Term ──
+      if (term === 'Third Term') {
+        await enrichWithTermAverages(classStudentsWithTerm, studentLoginData.className);
       }
 
       // ── STEP 6: Render ALL class students (needed for correct ranking) ──
@@ -5005,11 +4985,10 @@ function generateFromDetail() {
       // Stamp the selected term onto each record (ensures correct term label on cards)
       students = freshStudents.map(s => ({ ...s, Term: currentTerm }));
 
-      // ── Annual Summary fix: fetch 1st term avg for Second Term, and
-      //    1st + 2nd term averages for Third Term ──
-      if (currentTerm === 'Second Term' || currentTerm === 'Third Term') {
-        showToast('⏳ Loading term averages for Annual Summary…');
-        await enrichWithTermAverages(students, currentClass, currentTerm);
+      // ── Annual Summary fix: fetch 1st & 2nd term averages for Third Term ──
+      if (currentTerm === 'Third Term') {
+        showToast('⏳ Loading annual averages from all terms…');
+        await enrichWithTermAverages(students, currentClass);
       }
 
       // Now switch to admin dashboard and show reports
@@ -5089,43 +5068,54 @@ function parseCSV(csv) {
    Call BEFORE renderCards() when term === 'Third Term'.
    The students array is mutated in-place; renderCards stays unchanged.
    ============================================================ */
-async function enrichWithTermAverages(students, className, currentTerm) {
+async function enrichWithTermAverages(students, className) {
   // Only enrich when we have a valid className linked
   if (!className) return;
 
   // Helper: extract a student's average from a parsed CSV row.
   // Looks for explicit "Average" / "Avg" columns, or computes from subjects.
-  // `activeSubjects` restricts the computed average to subjects that at
-  // least one student in that term's class actually has a score for —
-  // this mirrors the same blank-subject fix used in renderCards().
-  function extractAvg(row, activeSubjects) {
+  // `allRows` (optional) — every student row for that term/class — is
+  // used to figure out which subjects have AT LEAST ONE student with a
+  // non-zero score, so a subject that's blank for the WHOLE class isn't
+  // counted in the divisor (same rule used in renderCards).
+  function extractAvg(row, allRows) {
     // 1. Explicit column names
     const explicit = row['Average'] || row['Avg'] || row['Term Average'] ||
                      row['Term_Average'] || row['Total Average'] || '';
     if (explicit !== '' && !isNaN(parseFloat(explicit))) {
       return +parseFloat(explicit).toFixed(2);
     }
-    // 2. Compute from subject totals (same logic as renderCards), skipping
-    //    any subject nobody in the class attempted.
-    if (!activeSubjects || !activeSubjects.size) return null;
+    // 2. Compute from subject totals (same logic as renderCards)
+    const headers = Object.keys(row);
+    const subjects = [...new Set(
+      headers
+        .filter(h => h.includes('_CA') || h.includes('_Exams'))
+        .map(h => h.split('_')[0])
+    )];
+    if (!subjects.length) return null;
+
+    const rowsForActiveCheck = (allRows && allRows.length) ? allRows : [row];
+    const subjectTotal = (r, sub) =>
+      (parseFloat(r[`${sub}_CA1`])   || 0) +
+      (parseFloat(r[`${sub}_CA2`])   || 0) +
+      (parseFloat(r[`${sub}_CA3`])   || 0) +
+      (parseFloat(r[`${sub}_Exams`]) || 0);
+    const activeSubjects = subjects.filter(sub =>
+      rowsForActiveCheck.some(r => subjectTotal(r, sub) > 0)
+    );
+
     let totalMarks = 0, subjectCount = 0;
     activeSubjects.forEach(sub => {
-      const s1   = parseFloat(row[`${sub}_CA1`])   || 0;
-      const s2   = parseFloat(row[`${sub}_CA2`])   || 0;
-      const s3   = parseFloat(row[`${sub}_CA3`])   || 0;
-      const exam = parseFloat(row[`${sub}_Exams`]) || 0;
-      totalMarks += s1 + s2 + s3 + exam;
+      totalMarks += subjectTotal(row, sub);
       subjectCount++;
     });
     return subjectCount ? +(totalMarks / subjectCount).toFixed(2) : null;
   }
 
-  // Fetch and parse a term CSV, returning a map keyed by lower-case Admission
-  // No, plus the set of subjects that are actually active (non-blank) for
-  // this term's class.
-  async function fetchTermData(term) {
+  // Fetch and parse a term CSV, returning a map keyed by lower-case Admission No
+  async function fetchTermMap(term) {
     const url = getTermUrl(className, term);
-    if (!url) return { map: {}, activeSubjects: new Set() };
+    if (!url) return {};
     try {
       const csv  = await fetchCSV(url);
       const rows = parseCSV(csv);
@@ -5134,61 +5124,43 @@ async function enrichWithTermAverages(students, className, currentTerm) {
         const adm = (row['Admission No'] || '').trim().toLowerCase();
         if (adm) map[adm] = row;
       });
-      const headers  = rows.length ? Object.keys(rows[0]) : [];
-      const subjects = [...new Set(
-        headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => h.split('_')[0])
-      )];
-      const activeSubjects = new Set();
-      subjects.forEach(sub => {
-        const hasAnyScore = rows.some(r =>
-          (parseFloat(r[`${sub}_CA1`])   || 0) ||
-          (parseFloat(r[`${sub}_CA2`])   || 0) ||
-          (parseFloat(r[`${sub}_CA3`])   || 0) ||
-          (parseFloat(r[`${sub}_Exams`]) || 0)
-        );
-        if (hasAnyScore) activeSubjects.add(sub);
-      });
-      return { map, activeSubjects };
+      return map;
     } catch (e) {
       console.warn(`enrichWithTermAverages: could not fetch ${term} for ${className}`, e);
-      return { map: {}, activeSubjects: new Set() };
+      return {};
     }
   }
 
-  // Only fetch the earlier term(s) actually needed for the term being viewed:
-  //   Second Term needs First Term.  Third Term needs First AND Second Term.
-  const needFirst  = currentTerm === 'Second Term' || currentTerm === 'Third Term';
-  const needSecond = currentTerm === 'Third Term';
-
-  const [firstData, secondData] = await Promise.all([
-    needFirst  ? fetchTermData('First Term')  : Promise.resolve({ map: {}, activeSubjects: new Set() }),
-    needSecond ? fetchTermData('Second Term') : Promise.resolve({ map: {}, activeSubjects: new Set() })
+  // Fetch both earlier terms in parallel
+  const [firstMap, secondMap] = await Promise.all([
+    fetchTermMap('First Term'),
+    fetchTermMap('Second Term')
   ]);
+  // Full row sets (every student in the class for that term) — needed so
+  // extractAvg can tell which subjects are blank across the WHOLE class.
+  const firstMapRows  = Object.values(firstMap);
+  const secondMapRows = Object.values(secondMap);
 
-  // Stamp averages onto each student record
+  // Stamp averages onto each Third Term student record
   students.forEach(stu => {
     const adm = (stu['Admission No'] || '').trim().toLowerCase();
 
     // ── First Term average ──
-    // Only overwrite if the column is blank/zero in the current sheet
-    if (needFirst) {
-      const existingAvg1 = parseFloat(stu['First_Term_Avg'] || stu['1st_Term_Avg'] || 0);
-      if ((!existingAvg1 || isNaN(existingAvg1)) && firstData.map[adm]) {
-        const computed = extractAvg(firstData.map[adm], firstData.activeSubjects);
-        if (computed !== null) {
-          stu['First_Term_Avg'] = computed;
-        }
+    // Only overwrite if the column is blank/zero in the Third Term sheet
+    const existingAvg1 = parseFloat(stu['First_Term_Avg'] || stu['1st_Term_Avg'] || 0);
+    if ((!existingAvg1 || isNaN(existingAvg1)) && firstMap[adm]) {
+      const computed = extractAvg(firstMap[adm], firstMapRows);
+      if (computed !== null) {
+        stu['First_Term_Avg'] = computed;
       }
     }
 
     // ── Second Term average ──
-    if (needSecond) {
-      const existingAvg2 = parseFloat(stu['Second_Term_Avg'] || stu['2nd_Term_Avg'] || 0);
-      if ((!existingAvg2 || isNaN(existingAvg2)) && secondData.map[adm]) {
-        const computed = extractAvg(secondData.map[adm], secondData.activeSubjects);
-        if (computed !== null) {
-          stu['Second_Term_Avg'] = computed;
-        }
+    const existingAvg2 = parseFloat(stu['Second_Term_Avg'] || stu['2nd_Term_Avg'] || 0);
+    if ((!existingAvg2 || isNaN(existingAvg2)) && secondMap[adm]) {
+      const computed = extractAvg(secondMap[adm], secondMapRows);
+      if (computed !== null) {
+        stu['Second_Term_Avg'] = computed;
       }
     }
   });
@@ -5451,23 +5423,28 @@ function renderCards(container, rawStudents, formMasterOverride) {
     return;
   }
 
-  /* ── AVERAGE FIX: don't divide by subjects nobody has scores for ──
-     A subject only counts toward the average denominator if AT LEAST
-     ONE student in this batch has a non-zero CA1/CA2/CA3/Exam value
-     for it. Subjects that are completely blank across every student
-     (no CA, no Exam — i.e. not offered/not yet uploaded) are excluded
-     from subjectCount so they don't unfairly drag the average down. */
-  const activeSubjects = new Set();
-  subjects.forEach(sub => {
-    const hasAnyScore = rawStudents.some(stu => {
-      const s1 = getSubjVal(stu, sub, 'CA1');
-      const s2 = getSubjVal(stu, sub, 'CA2');
-      const s3 = getSubjVal(stu, sub, 'CA3');
-      const exam = getSubjVal(stu, sub, 'Exams');
-      return (s1 || s2 || s3 || exam);
-    });
-    if (hasAnyScore) activeSubjects.add(sub);
-  });
+  // ── FIX: Average should not be diluted by subjects nobody in the
+  // class actually has scores for (e.g. a subject column that exists
+  // but every student's CA1/CA2/CA3/Exams are blank/zero — such as a
+  // subject not offered this term, or not yet marked by any teacher).
+  // We scan ALL students first to find which subjects have AT LEAST
+  // ONE student with a non-zero CA or Exam score ("active subjects").
+  // Every student's average is then divided by the number of active
+  // subjects (a class-wide, consistent divisor) instead of the raw
+  // total subject-column count. Subjects with zero scores across the
+  // WHOLE class are excluded from the divisor for everyone, but still
+  // display as a row (with 0/ABSENT) on the report card. ──
+  const activeSubjectsSet = new Set(
+    subjects.filter(sub => rawStudents.some(s => {
+      const cat = s['Class Category'] || 'Primary';
+      const m   = getScoringMode(cat);
+      const s1  = getSubjVal(s, sub, 'CA1');
+      const s2  = getSubjVal(s, sub, 'CA2');
+      const s3  = m.isJssSs ? getSubjVal(s, sub, 'CA3') : 0;
+      const ex  = getSubjVal(s, sub, 'Exams');
+      return (s1 + s2 + s3 + ex) > 0;
+    }))
+  );
 
   /* 1. Process each student's scores ────────────────────────── */
   const groups = {};
@@ -5484,7 +5461,8 @@ function renderCards(container, rawStudents, formMasterOverride) {
       const exam = getSubjVal(stu, sub, 'Exams');
       const total = s1 + s2 + s3 + exam;
       const grade = calculateGrade(total);
-      if (activeSubjects.has(sub)) { totalMarks += total; subjectCount++; }
+      const isActive = activeSubjectsSet.has(sub);
+      if (isActive) { totalMarks += total; subjectCount++; }
       const isAbsent = s1===0 && s2===0 && s3===0 && exam===0;
       processedSubjects.push({
         no: processedSubjects.length + 1,
@@ -5616,53 +5594,37 @@ function renderCards(container, rawStudents, formMasterOverride) {
           <td>${escapeHtml(s.remark)}</td>
         </tr>`).join('');
 
-      /* ─── START CUSTOM EDIT SECTION — Annual Summary (all 3 terms) ─── */
-      /* Annual Summary box now shows on First, Second AND Third Term —
-         each term progressively fills in more of the table:
-           • First Term:  shows 1st Avg only.       Ann.Avg/Grade/Pos = "—"
-           • Second Term: shows 1st + 2nd Avg.      Ann.Avg/Grade/Pos = "—"
-           • Third Term:  shows 1st + 2nd + 3rd Avg.
-               - If ALL THREE term averages were found → shows the real
-                 Annual Average, Grade, Position, and the Annual Remark.
-               - If 1st or 2nd Term average is still missing → Ann.Avg/
-                 Grade/Pos stay "—" and the remark falls back to the
-                 normal (non-annual) teacher's remark. */
-      const termLower    = (stu.term || '').toLowerCase();
-      const isFirstTerm  = termLower.includes('first')  || termLower === '1';
-      const isSecondTerm = termLower.includes('second') || termLower === '2';
-      const isThirdTerm  = termLower.includes('third')  || termLower === '3';
+      /* ─── START CUSTOM EDIT SECTION — Grading box vs Annual Summary ─── */
+      /* For First and Second Term: show normal grading box
+         For Third Term: show Annual Summary instead */
+      const termLower = (stu.term || '').toLowerCase();
+      const isThirdTerm = termLower.includes('third') || termLower === '3';
 
-      // This term's own computed average (from the sheet currently loaded)
-      const thisTermAvg = parseFloat(stu.avg) || 0;
-
-      // 1st/2nd term averages pulled from sheet columns (stamped in by
-      // enrichWithTermAverages for Second/Third Term). 0 = not found yet.
+      /* Annual Summary box (Third Term only)
+         ── HOW IT WORKS ──
+         The system reads "First_Term_Avg", "Second_Term_Avg", "Third_Term_Avg" columns
+         from the student's CSV row. These should be numeric averages for each term.
+         If a column is missing or blank, it is treated as 0 but still divides by 3,
+         so the annual average is always (1st + 2nd + 3rd) / 3.
+         Add these columns to your Third Term Google Sheet to enable real annual averages. */
+      const avg3 = parseFloat(stu.avg); // current (Third) term average
+      // Read 1st and 2nd term averages from sheet columns if present, else use 0
       const raw1 = parseFloat(stu['First_Term_Avg']  || stu['1st_Term_Avg']  || 0);
       const raw2 = parseFloat(stu['Second_Term_Avg'] || stu['2nd_Term_Avg']  || 0);
-      const sheetAvg1 = isNaN(raw1) ? 0 : +raw1.toFixed(2);
-      const sheetAvg2 = isNaN(raw2) ? 0 : +raw2.toFixed(2);
+      const avg1 = isNaN(raw1) ? 0 : +raw1.toFixed(2);
+      const avg2 = isNaN(raw2) ? 0 : +raw2.toFixed(2);
 
-      let avg1 = 0, avg2 = 0, avg3 = 0;
-      if (isFirstTerm)  { avg1 = thisTermAvg; }
-      if (isSecondTerm) { avg1 = sheetAvg1; avg2 = thisTermAvg; }
-      if (isThirdTerm)  { avg1 = sheetAvg1; avg2 = sheetAvg2; avg3 = thisTermAvg; }
+      // Annual average = always divide by 3 (even if some terms are blank/zero)
+      const annualAvg   = +((avg1 + avg2 + avg3) / 3).toFixed(2);
+      const annualGrade = calculateGrade(annualAvg);
 
-      // Only show the Annual Average/Grade/Position once we're on Third
-      // Term AND all three term averages were actually found (non-zero).
-      const allTermsFound = avg1 > 0 && avg2 > 0 && avg3 > 0;
-      const showAnnualCols = isThirdTerm && allTermsFound;
+      // Annual position: use the real annual ranking calculated by calculateAnnualPositions().
+      // This is based on (1st + 2nd + 3rd term averages) / 3, NOT just the Third Term alone.
+      // Falls back to _pos if _annualPos is somehow undefined (should never happen in normal use).
+      const annualPos = stu._annualPos !== undefined ? stu._annualPos : stu._pos;
 
-      const annualAvg   = showAnnualCols ? +((avg1 + avg2 + avg3) / 3).toFixed(2) : null;
-      const annualGrade = showAnnualCols ? calculateGrade(annualAvg) : null;
-
-      // Annual position: from calculateAnnualPositions(); falls back to _pos.
-      const annualPos = showAnnualCols
-        ? (stu._annualPos !== undefined ? stu._annualPos : stu._pos)
-        : null;
-
-      // Display helpers: "—" for a missing/blank value
+      // Display helper: show "—" for a missing term average (zero means not provided)
       const fmtAvg = v => (v === 0 ? '—' : v + '%');
-      const DASH = '—';
 
       const annualSummaryHtml = `
         <div class="annual-summary-box">
@@ -5675,22 +5637,21 @@ function renderCards(container, rawStudents, formMasterOverride) {
               <tr>
                 <td>${fmtAvg(avg1)}</td>
                 <td>${fmtAvg(avg2)}</td>
-                <td>${fmtAvg(avg3)}</td>
-                <td>${showAnnualCols ? `<strong>${annualAvg}%</strong>` : DASH}</td>
-                <td>${showAnnualCols ? `<strong>${annualGrade}</strong>` : DASH}</td>
-                <td>${showAnnualCols ? `${annualPos}/${totalInClass}` : DASH}</td>
+                <td>${avg3}%</td>
+                <td><strong>${annualAvg}%</strong></td>
+                <td><strong>${annualGrade}</strong></td>
+                <td>${annualPos}/${totalInClass}</td>
               </tr>
             </tbody>
           </table>
         </div>`;
 
-      /* Remark: annual remark only when the full Annual Summary is showing
-         (Third Term with all 3 terms found), normal remark otherwise. */
-      const remarkText = showAnnualCols
+      /* Remark: annual remark on third term, normal remark otherwise */
+      const remarkText = isThirdTerm
         ? getAnnualRemark(annualGrade)
         : stu.teacherRemark;
 
-      /* ─── END CUSTOM EDIT SECTION — Annual Summary (all 3 terms) ─── */
+      /* ─── END CUSTOM EDIT SECTION — Grading box vs Annual Summary ─── */
 
       /* ─── Header contact line (only shows fields that are filled in) ─── */
       const contactParts = [];
@@ -5778,7 +5739,7 @@ function renderCards(container, rawStudents, formMasterOverride) {
           </table>
         </div>
 
-        ${annualSummaryHtml}
+        ${isThirdTerm ? annualSummaryHtml : ''}
 
         <div class="rc-remarks-box">
           <div class="rc-remark-line"><span class="rc-label">Class Teacher's Remark:</span>${escapeHtml(remarkText)}</div>
@@ -6090,15 +6051,18 @@ function computeAnalytics(records, className) {
     headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => h.split('_')[0])
   )];
 
-  // AVERAGE FIX: exclude subjects nobody in this class has any score for.
-  const activeSubjects = new Set();
-  subjects.forEach(sub => {
-    const hasAnyScore = records.some(stu =>
-      (+stu[sub + '_CA1'] || 0) || (+stu[sub + '_CA2'] || 0) ||
-      (+stu[sub + '_CA3'] || 0) || (+stu[sub + '_Exams'] || 0)
-    );
-    if (hasAnyScore) activeSubjects.add(sub);
-  });
+  // ── FIX: exclude subjects that are blank/zero for EVERY student in
+  // the class from the average's divisor (same rule as renderCards). ──
+  const activeSubjectsSet = new Set(
+    subjects.filter(sub => records.some(s => {
+      const m = getScoringMode(s['Class Category'] || 'Primary');
+      const total = (+s[sub + '_CA1']   || 0) +
+                    (+s[sub + '_CA2']   || 0) +
+                    (m.isJssSs ? (+s[sub + '_CA3'] || 0) : 0) +
+                    (+s[sub + '_Exams'] || 0);
+      return total > 0;
+    }))
+  );
 
   let maleCount = 0, femaleCount = 0;
   let passCount = 0, failCount = 0;
@@ -6114,12 +6078,12 @@ function computeAnalytics(records, className) {
     const mode = getScoringMode(stu['Class Category'] || 'Primary');
     let total = 0, count = 0;
     subjects.forEach(sub => {
-      const subTotal = (+stu[sub + '_CA1']   || 0) +
+      if (!activeSubjectsSet.has(sub)) return;
+      total += (+stu[sub + '_CA1']   || 0) +
                (+stu[sub + '_CA2']   || 0) +
                (mode.isJssSs ? (+stu[sub + '_CA3'] || 0) : 0) +
                (+stu[sub + '_Exams'] || 0);
-      total += subTotal;
-      if (activeSubjects.has(sub)) count++;
+      count++;
     });
     const avg = count ? +(total / count).toFixed(2) : 0;
     if (avg > highestAvg) { highestAvg = avg; highestName = stu['Name'] || ''; }
@@ -6142,7 +6106,7 @@ function computeAnalytics(records, className) {
     highestName,
     lowestName,
     passCount,
-    subjectCount: activeSubjects.size,
+    subjectCount: activeSubjectsSet.size,
     classAvg, passRate, failRate
   };
 }
@@ -6178,20 +6142,31 @@ async function computeStudentAnnualAvg(className) {
     ...Object.keys(thirdMap)
   ]);
 
-  function extractStudentAvg(row) {
+  // Same rule as elsewhere: a subject blank/zero for EVERY student in a
+  // given term's class roster is excluded from that term's average
+  // divisor — passing `allRows` (the whole term's map values) lets us
+  // detect that at the class level rather than per-student.
+  function extractStudentAvg(row, allRows) {
     if (!row) return null;
     const headers = Object.keys(row);
     const subjects = [...new Set(
       headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => h.split('_')[0])
     )];
     if (!subjects.length) return null;
+    const rowsForActiveCheck = (allRows && allRows.length) ? allRows : [row];
+    const subjectTotal = (r, sub) => (+r[sub+'_CA1']||0)+(+r[sub+'_CA2']||0)+(+r[sub+'_CA3']||0)+(+r[sub+'_Exams']||0);
+    const activeSubjects = subjects.filter(sub => rowsForActiveCheck.some(r => subjectTotal(r, sub) > 0));
     let total = 0, count = 0;
-    subjects.forEach(sub => {
-      total += (+row[sub+'_CA1']||0)+(+row[sub+'_CA2']||0)+(+row[sub+'_CA3']||0)+(+row[sub+'_Exams']||0);
+    activeSubjects.forEach(sub => {
+      total += subjectTotal(row, sub);
       count++;
     });
     return count ? +(total / count).toFixed(2) : null;
   }
+
+  const firstRows  = Object.values(firstMap);
+  const secondRows = Object.values(secondMap);
+  const thirdRows  = Object.values(thirdMap);
 
   let best = null;
   allAdm.forEach(adm => {
@@ -6199,9 +6174,9 @@ async function computeStudentAnnualAvg(className) {
     const name = (row && row['Name']) ? row['Name'] : '';
     if (!name) return;
     const avgs = [
-      extractStudentAvg(firstMap[adm]),
-      extractStudentAvg(secondMap[adm]),
-      extractStudentAvg(thirdMap[adm])
+      extractStudentAvg(firstMap[adm], firstRows),
+      extractStudentAvg(secondMap[adm], secondRows),
+      extractStudentAvg(thirdMap[adm], thirdRows)
     ].filter(v => v !== null);
     if (!avgs.length) return;
     const annual = +(avgs.reduce((a,b)=>a+b,0)/avgs.length).toFixed(2);
@@ -7868,19 +7843,19 @@ function computeClassRanking(rawStudents) {
     return actualHeader ? (stu[actualHeader] || 0) : 0;
   };
 
-  // AVERAGE FIX: exclude subjects nobody in this class has any score for
-  // (same rule as renderCards) so the average isn't divided by blanks.
-  const activeSubjects = new Set();
-  subjects.forEach(sub => {
-    const hasAnyScore = rawStudents.some(stu => {
-      const s1 = getSubjVal(stu, sub, 'CA1');
-      const s2 = getSubjVal(stu, sub, 'CA2');
-      const s3 = getSubjVal(stu, sub, 'CA3');
-      const exam = getSubjVal(stu, sub, 'Exams');
-      return (s1 || s2 || s3 || exam);
-    });
-    if (hasAnyScore) activeSubjects.add(sub);
-  });
+  // ── FIX: same as renderCards — exclude subjects that are blank/zero
+  // for EVERY student in the class from the average's divisor. ──
+  const activeSubjectsSet = new Set(
+    subjects.filter(sub => rawStudents.some(s => {
+      const cat = s['Class Category'] || 'Primary';
+      const m   = getScoringMode(cat);
+      const s1  = getSubjVal(s, sub, 'CA1');
+      const s2  = getSubjVal(s, sub, 'CA2');
+      const s3  = m.isJssSs ? getSubjVal(s, sub, 'CA3') : 0;
+      const ex  = getSubjVal(s, sub, 'Exams');
+      return (s1 + s2 + s3 + ex) > 0;
+    }))
+  );
 
   const ranked = rawStudents.map(stu => {
     const category = stu['Class Category'] || 'Primary';
@@ -7891,8 +7866,10 @@ function computeClassRanking(rawStudents) {
       const s2   = getSubjVal(stu, sub, 'CA2');
       const s3   = mode.isJssSs ? getSubjVal(stu, sub, 'CA3') : 0;
       const exam = getSubjVal(stu, sub, 'Exams');
-      totalMarks += (s1 + s2 + s3 + exam);
-      if (activeSubjects.has(sub)) subjectCount++;
+      if (activeSubjectsSet.has(sub)) {
+        totalMarks += (s1 + s2 + s3 + exam);
+        subjectCount++;
+      }
     });
     const avg = subjectCount ? +(totalMarks / subjectCount).toFixed(2) : 0;
     return { name: stu['Name'] || '—', gender: stu['Gender'] || '—', totalMarks, avg };
@@ -7914,9 +7891,9 @@ async function buildMasterListTableHtml(className) {
   const { records, term } = await fetchBestAvailableStudents(className);
   if (!records.length) return null;
 
-  // Keep the students in the SAME order they appear in the Google Sheet
-  // (no alphabetical sorting) so the Master List matches the sheet.
-  const sorted = records;
+  const sorted = [...records].sort((a, b) =>
+    String(a['Name'] || '').localeCompare(String(b['Name'] || ''))
+  );
 
   const rows = sorted.map((s, i) => `
     <tr style="background:${i % 2 === 0 ? '#fff' : '#FBF6EC'};">
@@ -8031,12 +8008,11 @@ function renderMasterListGrid() {
 }
 
 /** Shows/hides the small "Generating document…" loading bar on the
-    Master List tab (admin and/or teacher dashboard, whichever is present). */
+    Master List tab. */
 function setMasterListLoading(on) {
   const loader = $('masterlist-loading');
-  if (loader) loader.classList.toggle('visible', !!on);
-  const teacherLoader = $('teacher-masterlist-loading');
-  if (teacherLoader) teacherLoader.classList.toggle('visible', !!on);
+  if (!loader) return;
+  loader.classList.toggle('visible', !!on);
 }
 
 async function downloadMasterList(className) {
@@ -8612,7 +8588,6 @@ function renderTeacherDashboard() {
   // Reset My Classes drill-down to step 1
   teacherResetMyClassesView();
   renderTeacherClassesGrid();
-  renderTeacherMasterListGrid();
 
   // Default to Dashboard tab + sidebar state
   switchTeacherTab('t-tab-dashboard');
@@ -8644,51 +8619,6 @@ function renderTeacherClassesGrid() {
       <div class="class-card-name">${escapeHtml(c.realClassName)}</div>
       <div class="class-card-sub">${c.subjects.length} subject${c.subjects.length === 1 ? '' : 's'} you teach</div>
     </div>`).join('');
-}
-
-/** Populates the teacher's own Master List grid — one card per class the
-    teacher is assigned to, reusing the same download/print builders as
-    the admin Master List (buildMasterListTableHtml/buildPositionListTableHtml),
-    so both stay identical and in sheet order (no alphabetical sorting). */
-function renderTeacherMasterListGrid() {
-  const grid = $('teacherMasterListGrid');
-  if (!grid) return;
-  if (!teacherMyClasses.length) {
-    grid.innerHTML = '<p class="t-empty-note" style="grid-column:1/-1;">No classes assigned yet. Contact the school admin.</p>';
-    return;
-  }
-
-  // De-duplicate real class-arm names in case a teacher's subjects list
-  // resolves to the same arm more than once.
-  const seen = new Set();
-  const classes = teacherMyClasses.filter(c => {
-    if (seen.has(c.realClassName)) return false;
-    seen.add(c.realClassName);
-    return true;
-  });
-
-  grid.innerHTML = classes.map(c => {
-    const isPrimary6 = /primary\s*6/i.test(c.realClassName);
-    const hasThird   = !!getTermUrl(c.realClassName, 'Third Term');
-    const safeName   = c.realClassName.replace(/'/g, "\\'");
-    return `
-      <div class="class-card cat-primary" style="cursor:default;">
-        <div class="class-card-badge badge-primary">${escapeHtml(c.levelLabel)}</div>
-        <div class="class-card-icon">📋</div>
-        <div class="class-card-name">${escapeHtml(c.realClassName)}</div>
-        <div class="class-card-sub">Student Roster</div>
-        <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px;">
-          <button class="btn-report btn-report-outline" style="width:100%;justify-content:center;" onclick="downloadMasterList('${safeName}')">📥 Download Master List</button>
-          <button class="btn-report btn-report-outline" style="width:100%;justify-content:center;" onclick="printMasterListDoc('${safeName}')">🖨️ Print Master List</button>
-          ${isPrimary6 && hasThird ? `
-            <div style="border-top:1.5px dashed rgba(92,51,23,0.25);margin-top:4px;padding-top:8px;">
-              <div style="font-size:10px;font-weight:900;color:#6A3FA0;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">🎓 3rd Term Position List</div>
-              <button class="btn-report btn-report-primary" style="width:100%;justify-content:center;margin-bottom:6px;" onclick="downloadPositionList('${safeName}')">📥 Download Position List</button>
-              <button class="btn-report btn-report-outline" style="width:100%;justify-content:center;" onclick="printPositionListDoc('${safeName}')">🖨️ Print Position List</button>
-            </div>` : ''}
-        </div>
-      </div>`;
-  }).join('');
 }
 
 function openTeacherClassSubjects(index) {
@@ -8776,9 +8706,7 @@ async function teacherLoadSubjectScores(term, btnEl) {
       noteHtml = `<p class="t-empty-note">No "${escapeHtml(teacherActiveSubject)}" scores have been recorded yet for this class's ${escapeHtml(term)} sheet.</p>`;
     }
 
-    // Keep the students in the SAME order they appear in the Google Sheet
-    // (no alphabetical sorting) so this matches the sheet.
-    const sorted = records;
+    const sorted = [...records].sort((a, b) => String(a['Name'] || '').localeCompare(String(b['Name'] || '')));
     const fmt = v => (v === null || v === undefined || isNaN(v)) ? '—' : v;
     const rows = sorted.map((s, i) => {
       const ca1 = getVal(s, 'CA1'), ca2 = getVal(s, 'CA2'), exam = getVal(s, 'Exams');
