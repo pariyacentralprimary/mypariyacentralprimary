@@ -6,8 +6,16 @@
 <title>Pariya Central Primary — Report Card System</title>
 
 <!-- ============================================================
-     PARIYA CENTRAL PRIMARY REPORT CARD SYSTEM  — Version 3.2
-     Changes in v3.2 (this version):
+     PARIYA CENTRAL PRIMARY REPORT CARD SYSTEM  — Version 3.3
+     Changes in v3.3 (this version):
+       • Term Summary box now shows on First & Second Term too, not just Third
+       • First Term:  only 1st Avg shown; Ann. Avg/Grade/Position blank ("—")
+       • Second Term: 1st + 2nd Avg shown; Ann. Avg/Grade/Position blank ("—")
+       • Third Term:  Ann. Avg/Grade/Position only shown if BOTH 1st and 2nd
+         term averages were actually found on the sheet — otherwise blank ("—")
+       • Annual Remark only shown once all 3 terms are genuinely present;
+         normal per-term remark shown otherwise
+     Changes in v3.2:
        • CLASS_LINKS now has separate first/second/third CSV per class
        • Term buttons load ONLY the correct term CSV (no more shared data bug)
        • Student portal fetches fresh CSV per term (correct term data)
@@ -2912,7 +2920,7 @@ canvas.pa-chart {
             </div>
             <div class="ad-card-body">
               <div class="ad-class-grid" id="masterListGrid"></div>
-              <div id="masterlist-loading" class="loading-bar" style="margin-top:12px;">
+              <div id="masterlist-loading" class="loading-bar masterlist-loading-el" style="margin-top:12px;">
                 <div class="spinner"></div>
                 <span>Generating document…</span>
               </div>
@@ -3851,6 +3859,9 @@ canvas.pa-chart {
         <button class="ad-sb-item" onclick="switchTeacherTab('t-tab-myclasses');setTeacherSbActive(this);teacherResetMyClassesView();">
           <i class="fa-solid fa-chalkboard"></i> 📚 My Classes
         </button>
+        <button class="ad-sb-item" onclick="switchTeacherTab('t-tab-masterlist');setTeacherSbActive(this);renderTeacherMasterListGrid();">
+          <i class="fa-solid fa-list-check"></i> 🗂️ Master List
+        </button>
       </nav>
 
       <div class="ad-sb-bottom">
@@ -4041,6 +4052,27 @@ canvas.pa-chart {
             </div>
           </div>
 
+        </div>
+
+        <!-- ══ TAB: MASTER LIST ══ -->
+        <div id="t-tab-masterlist" class="t-tab-panel">
+          <div class="ad-card">
+            <div class="ad-card-header">
+              <div class="ad-card-title">
+                <i class="fa-solid fa-list-check"></i> Master List
+              </div>
+              <div style="font-size:12px;color:var(--ad-ink3);">
+                Student roster for the classes you teach, letter-headed and ready to download or print.
+              </div>
+            </div>
+            <div class="ad-card-body">
+              <div class="ad-class-grid" id="teacherMasterListGrid"></div>
+              <div id="teacher-masterlist-loading" class="loading-bar masterlist-loading-el" style="margin-top:12px;">
+                <div class="spinner"></div>
+                <span>Generating document…</span>
+              </div>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -4601,9 +4633,9 @@ function studentLoadTerm(term) {
       // ── STEP 5: Stamp the correct Term onto every student in the class ──
       const classStudentsWithTerm = classStudents.map(s => ({ ...s, Term: term }));
 
-      // ── Annual Summary fix: fetch 1st & 2nd term averages for Third Term ──
-      if (term === 'Third Term') {
-        await enrichWithTermAverages(classStudentsWithTerm, studentLoginData.className);
+      // ── Term/Annual Summary fix: fetch earlier term averages ──
+      if (term === 'Second Term' || term === 'Third Term') {
+        await enrichWithTermAverages(classStudentsWithTerm, studentLoginData.className, term);
       }
 
       // ── STEP 6: Render ALL class students (needed for correct ranking) ──
@@ -4985,10 +5017,10 @@ function generateFromDetail() {
       // Stamp the selected term onto each record (ensures correct term label on cards)
       students = freshStudents.map(s => ({ ...s, Term: currentTerm }));
 
-      // ── Annual Summary fix: fetch 1st & 2nd term averages for Third Term ──
-      if (currentTerm === 'Third Term') {
-        showToast('⏳ Loading annual averages from all terms…');
-        await enrichWithTermAverages(students, currentClass);
+      // ── Term/Annual Summary fix: fetch earlier term averages ──
+      if (currentTerm === 'Second Term' || currentTerm === 'Third Term') {
+        showToast('⏳ Loading earlier term averages…');
+        await enrichWithTermAverages(students, currentClass, currentTerm);
       }
 
       // Now switch to admin dashboard and show reports
@@ -5053,24 +5085,31 @@ function parseCSV(csv) {
 }
 
 /* ============================================================
-   ENRICH WITH TERM AVERAGES  (Third Term Annual Summary fix)
-   Purpose: Dynamically fetch First & Second Term CSVs and stamp
+   ENRICH WITH TERM AVERAGES  (Term/Annual Summary fix)
+   Purpose: Dynamically fetch earlier Term CSVs and stamp
             First_Term_Avg / Second_Term_Avg onto each student
-            record so the Annual Summary table populates correctly.
+            record so the Term/Annual Summary table populates
+            correctly on Second Term (needs 1st) and Third Term
+            (needs 1st + 2nd).
    ── WHY THIS IS NEEDED ──
-   The Annual Summary reads stu['First_Term_Avg'] and
-   stu['Second_Term_Avg'] from the Third Term CSV row.
+   The Term/Annual Summary reads stu['First_Term_Avg'] and
+   stu['Second_Term_Avg'] from the current term's CSV row.
    When those columns are blank/missing the table shows "—" for
-   1st and 2nd averages, making the Annual Average wrong.
+   1st and/or 2nd averages.
    This function fixes that by loading the other term CSVs
    and matching students by Admission No → Name → order.
    ── USAGE ──
-   Call BEFORE renderCards() when term === 'Third Term'.
-   The students array is mutated in-place; renderCards stays unchanged.
+   Call BEFORE renderCards() when term === 'Second Term' or
+   'Third Term'. Pass the currentTerm so it only fetches the
+   terms that actually precede it (First Term has nothing to
+   enrich from). The students array is mutated in-place;
+   renderCards stays unchanged.
    ============================================================ */
-async function enrichWithTermAverages(students, className) {
+async function enrichWithTermAverages(students, className, currentTerm) {
   // Only enrich when we have a valid className linked
   if (!className) return;
+  // First Term has no earlier terms to pull from
+  if (currentTerm === 'First Term') return;
 
   // Helper: extract a student's average from a parsed CSV row.
   // Looks for explicit "Average" / "Avg" columns, or computes from subjects.
@@ -5131,36 +5170,43 @@ async function enrichWithTermAverages(students, className) {
     }
   }
 
-  // Fetch both earlier terms in parallel
+  // Second Term only needs First Term; Third Term needs both.
+  const needsFirst  = currentTerm === 'Second Term' || currentTerm === 'Third Term';
+  const needsSecond = currentTerm === 'Third Term';
+
   const [firstMap, secondMap] = await Promise.all([
-    fetchTermMap('First Term'),
-    fetchTermMap('Second Term')
+    needsFirst  ? fetchTermMap('First Term')  : Promise.resolve({}),
+    needsSecond ? fetchTermMap('Second Term') : Promise.resolve({})
   ]);
   // Full row sets (every student in the class for that term) — needed so
   // extractAvg can tell which subjects are blank across the WHOLE class.
   const firstMapRows  = Object.values(firstMap);
   const secondMapRows = Object.values(secondMap);
 
-  // Stamp averages onto each Third Term student record
+  // Stamp averages onto each student record
   students.forEach(stu => {
     const adm = (stu['Admission No'] || '').trim().toLowerCase();
 
     // ── First Term average ──
-    // Only overwrite if the column is blank/zero in the Third Term sheet
-    const existingAvg1 = parseFloat(stu['First_Term_Avg'] || stu['1st_Term_Avg'] || 0);
-    if ((!existingAvg1 || isNaN(existingAvg1)) && firstMap[adm]) {
-      const computed = extractAvg(firstMap[adm], firstMapRows);
-      if (computed !== null) {
-        stu['First_Term_Avg'] = computed;
+    // Only overwrite if the column is blank/zero in the current sheet
+    if (needsFirst) {
+      const existingAvg1 = parseFloat(stu['First_Term_Avg'] || stu['1st_Term_Avg'] || 0);
+      if ((!existingAvg1 || isNaN(existingAvg1)) && firstMap[adm]) {
+        const computed = extractAvg(firstMap[adm], firstMapRows);
+        if (computed !== null) {
+          stu['First_Term_Avg'] = computed;
+        }
       }
     }
 
     // ── Second Term average ──
-    const existingAvg2 = parseFloat(stu['Second_Term_Avg'] || stu['2nd_Term_Avg'] || 0);
-    if ((!existingAvg2 || isNaN(existingAvg2)) && secondMap[adm]) {
-      const computed = extractAvg(secondMap[adm], secondMapRows);
-      if (computed !== null) {
-        stu['Second_Term_Avg'] = computed;
+    if (needsSecond) {
+      const existingAvg2 = parseFloat(stu['Second_Term_Avg'] || stu['2nd_Term_Avg'] || 0);
+      if ((!existingAvg2 || isNaN(existingAvg2)) && secondMap[adm]) {
+        const computed = extractAvg(secondMap[adm], secondMapRows);
+        if (computed !== null) {
+          stu['Second_Term_Avg'] = computed;
+        }
       }
     }
   });
@@ -5595,59 +5641,84 @@ function renderCards(container, rawStudents, formMasterOverride) {
         </tr>`).join('');
 
       /* ─── START CUSTOM EDIT SECTION — Grading box vs Annual Summary ─── */
-      /* For First and Second Term: show normal grading box
-         For Third Term: show Annual Summary instead */
-      const termLower = (stu.term || '').toLowerCase();
-      const isThirdTerm = termLower.includes('third') || termLower === '3';
+      /* Term Summary box shows on EVERY term now:
+           • First Term  → shows only the 1st term average; 2nd/3rd Avg,
+                            Annual Avg, Grade and Position are blank ("—").
+           • Second Term → shows 1st + 2nd term averages; 3rd Avg,
+                            Annual Avg, Grade and Position are blank ("—").
+           • Third Term  → shows 1st + 2nd + 3rd term averages. Annual
+                            Avg/Grade/Position ONLY appear if BOTH the
+                            1st and 2nd term averages were actually found
+                            on the sheet — otherwise they stay blank ("—")
+                            even though it's the final term.
+         The Annual Remark (vs. the normal per-term remark) only shows
+         once all three terms are genuinely present. */
+      const termLower  = (stu.term || '').toLowerCase();
+      const isFirstTerm  = termLower.includes('first')  || termLower === '1';
+      const isSecondTerm = termLower.includes('second') || termLower === '2';
+      const isThirdTerm  = termLower.includes('third')  || termLower === '3';
 
-      /* Annual Summary box (Third Term only)
-         ── HOW IT WORKS ──
-         The system reads "First_Term_Avg", "Second_Term_Avg", "Third_Term_Avg" columns
-         from the student's CSV row. These should be numeric averages for each term.
-         If a column is missing or blank, it is treated as 0 but still divides by 3,
-         so the annual average is always (1st + 2nd + 3rd) / 3.
-         Add these columns to your Third Term Google Sheet to enable real annual averages. */
-      const avg3 = parseFloat(stu.avg); // current (Third) term average
-      // Read 1st and 2nd term averages from sheet columns if present, else use 0
-      const raw1 = parseFloat(stu['First_Term_Avg']  || stu['1st_Term_Avg']  || 0);
-      const raw2 = parseFloat(stu['Second_Term_Avg'] || stu['2nd_Term_Avg']  || 0);
-      const avg1 = isNaN(raw1) ? 0 : +raw1.toFixed(2);
-      const avg2 = isNaN(raw2) ? 0 : +raw2.toFixed(2);
+      // Display helper: show "—" for a missing/blank term average
+      const fmtAvg = v => (!v ? '—' : v + '%');
 
-      // Annual average = always divide by 3 (even if some terms are blank/zero)
-      const annualAvg   = +((avg1 + avg2 + avg3) / 3).toFixed(2);
-      const annualGrade = calculateGrade(annualAvg);
+      const currentAvg = parseFloat(stu.avg) || 0;
+      let avg1 = 0, avg2 = 0, avg3 = 0;
 
+      if (isFirstTerm) {
+        avg1 = currentAvg;
+      } else if (isSecondTerm) {
+        const raw1 = parseFloat(stu['First_Term_Avg'] || stu['1st_Term_Avg'] || 0);
+        avg1 = isNaN(raw1) ? 0 : +raw1.toFixed(2);
+        avg2 = currentAvg;
+      } else {
+        // Third Term (also the fallback for any unrecognised term label)
+        const raw1 = parseFloat(stu['First_Term_Avg']  || stu['1st_Term_Avg']  || 0);
+        const raw2 = parseFloat(stu['Second_Term_Avg'] || stu['2nd_Term_Avg']  || 0);
+        avg1 = isNaN(raw1) ? 0 : +raw1.toFixed(2);
+        avg2 = isNaN(raw2) ? 0 : +raw2.toFixed(2);
+        avg3 = currentAvg;
+      }
+
+      // Annual Avg/Grade/Position only compute — and only display — once
+      // ALL three term averages are genuinely present (1st & 2nd found on
+      // the sheet, and we're on the Third Term so the 3rd is the live one).
+      const haveAllThreeTerms = isThirdTerm && !!avg1 && !!avg2;
+      const annualAvg   = haveAllThreeTerms ? +((avg1 + avg2 + avg3) / 3).toFixed(2) : null;
+      const annualGrade = haveAllThreeTerms ? calculateGrade(annualAvg) : null;
       // Annual position: use the real annual ranking calculated by calculateAnnualPositions().
-      // This is based on (1st + 2nd + 3rd term averages) / 3, NOT just the Third Term alone.
-      // Falls back to _pos if _annualPos is somehow undefined (should never happen in normal use).
-      const annualPos = stu._annualPos !== undefined ? stu._annualPos : stu._pos;
+      const annualPos   = haveAllThreeTerms ? (stu._annualPos !== undefined ? stu._annualPos : stu._pos) : null;
 
-      // Display helper: show "—" for a missing term average (zero means not provided)
-      const fmtAvg = v => (v === 0 ? '—' : v + '%');
+      // Cell values: the CURRENT term's own average is always shown as-is
+      // (never blanked, since it's live data); earlier terms use fmtAvg so
+      // a genuinely missing sheet column reads as "—".
+      const cell1st = isFirstTerm  ? `${avg1}%` : fmtAvg(avg1);
+      const cell2nd = isSecondTerm ? `${avg2}%` : (isThirdTerm ? fmtAvg(avg2) : '—');
+      const cell3rd = isThirdTerm  ? `${avg3}%` : '—';
+
+      const summaryTitle = isThirdTerm ? '★ Annual Summary ★' : '★ Term Summary ★';
 
       const annualSummaryHtml = `
         <div class="annual-summary-box">
-          <div class="ann-title">★ Annual Summary ★</div>
+          <div class="ann-title">${summaryTitle}</div>
           <table>
             <thead>
               <tr><th>1st Avg</th><th>2nd Avg</th><th>3rd Avg</th><th>Ann. Avg</th><th>Grade</th><th>Pos</th></tr>
             </thead>
             <tbody>
               <tr>
-                <td>${fmtAvg(avg1)}</td>
-                <td>${fmtAvg(avg2)}</td>
-                <td>${avg3}%</td>
-                <td><strong>${annualAvg}%</strong></td>
-                <td><strong>${annualGrade}</strong></td>
-                <td>${annualPos}/${totalInClass}</td>
+                <td>${cell1st}</td>
+                <td>${cell2nd}</td>
+                <td>${cell3rd}</td>
+                <td><strong>${haveAllThreeTerms ? annualAvg + '%' : '—'}</strong></td>
+                <td><strong>${haveAllThreeTerms ? annualGrade : '—'}</strong></td>
+                <td>${haveAllThreeTerms ? annualPos + '/' + totalInClass : '—'}</td>
               </tr>
             </tbody>
           </table>
         </div>`;
 
-      /* Remark: annual remark on third term, normal remark otherwise */
-      const remarkText = isThirdTerm
+      /* Remark: annual remark only once all 3 terms are found, normal remark otherwise */
+      const remarkText = haveAllThreeTerms
         ? getAnnualRemark(annualGrade)
         : stu.teacherRemark;
 
@@ -5739,7 +5810,7 @@ function renderCards(container, rawStudents, formMasterOverride) {
           </table>
         </div>
 
-        ${isThirdTerm ? annualSummaryHtml : ''}
+        ${annualSummaryHtml}
 
         <div class="rc-remarks-box">
           <div class="rc-remark-line"><span class="rc-label">Class Teacher's Remark:</span>${escapeHtml(remarkText)}</div>
@@ -7891,9 +7962,8 @@ async function buildMasterListTableHtml(className) {
   const { records, term } = await fetchBestAvailableStudents(className);
   if (!records.length) return null;
 
-  const sorted = [...records].sort((a, b) =>
-    String(a['Name'] || '').localeCompare(String(b['Name'] || ''))
-  );
+  // Keep students in the same order as the Google Sheet (no alphabetizing)
+  const sorted = records;
 
   const rows = sorted.map((s, i) => `
     <tr style="background:${i % 2 === 0 ? '#fff' : '#FBF6EC'};">
@@ -8007,12 +8077,57 @@ function renderMasterListGrid() {
   }).join('');
 }
 
+/** Populate the Teacher Dashboard's Master List grid — same as the
+    admin one, but scoped to only the classes this teacher is
+    assigned to (from teacherMyClasses), in the order they were
+    assigned rather than alphabetically. */
+function renderTeacherMasterListGrid() {
+  const grid = $('teacherMasterListGrid');
+  if (!grid) return;
+
+  // De-duplicate real class names while preserving assignment order
+  const seen = new Set();
+  const classNames = [];
+  (teacherMyClasses || []).forEach(c => {
+    if (!seen.has(c.realClassName)) { seen.add(c.realClassName); classNames.push(c.realClassName); }
+  });
+
+  if (!classNames.length) {
+    grid.innerHTML = '<p class="t-empty-note" style="grid-column:1/-1;">No classes assigned yet. Contact the school admin.</p>';
+    return;
+  }
+
+  grid.innerHTML = classNames.map(name => {
+    const meta       = CLASS_META[name] || { icon: '📋', category: 'primary', badge: 'primary' };
+    const isPrimary6 = /primary\s*6/i.test(name);
+    const hasThird   = !!getTermUrl(name, 'Third Term');
+    const safeName   = name.replace(/'/g, "\\'");
+    return `
+      <div class="class-card cat-${meta.badge}" style="cursor:default;">
+        <div class="class-card-badge badge-${meta.badge}">${meta.category.toUpperCase()}</div>
+        <div class="class-card-icon">${meta.icon}</div>
+        <div class="class-card-name">${escapeHtml(name)}</div>
+        <div class="class-card-sub">Student Roster</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px;">
+          <button class="btn-report btn-report-outline" style="width:100%;justify-content:center;" onclick="downloadMasterList('${safeName}')">📥 Download Master List</button>
+          <button class="btn-report btn-report-outline" style="width:100%;justify-content:center;" onclick="printMasterListDoc('${safeName}')">🖨️ Print Master List</button>
+          ${isPrimary6 && hasThird ? `
+            <div style="border-top:1.5px dashed rgba(92,51,23,0.25);margin-top:4px;padding-top:8px;">
+              <div style="font-size:10px;font-weight:900;color:#6A3FA0;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;">🎓 3rd Term Position List</div>
+              <button class="btn-report btn-report-primary" style="width:100%;justify-content:center;margin-bottom:6px;" onclick="downloadPositionList('${safeName}')">📥 Download Position List</button>
+              <button class="btn-report btn-report-outline" style="width:100%;justify-content:center;" onclick="printPositionListDoc('${safeName}')">🖨️ Print Position List</button>
+            </div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
 /** Shows/hides the small "Generating document…" loading bar on the
     Master List tab. */
 function setMasterListLoading(on) {
-  const loader = $('masterlist-loading');
-  if (!loader) return;
-  loader.classList.toggle('visible', !!on);
+  document.querySelectorAll('.masterlist-loading-el').forEach(loader => {
+    loader.classList.toggle('visible', !!on);
+  });
 }
 
 async function downloadMasterList(className) {
@@ -8706,7 +8821,8 @@ async function teacherLoadSubjectScores(term, btnEl) {
       noteHtml = `<p class="t-empty-note">No "${escapeHtml(teacherActiveSubject)}" scores have been recorded yet for this class's ${escapeHtml(term)} sheet.</p>`;
     }
 
-    const sorted = [...records].sort((a, b) => String(a['Name'] || '').localeCompare(String(b['Name'] || '')));
+    // Keep students in the same order as the Google Sheet (no alphabetizing)
+    const sorted = records;
     const fmt = v => (v === null || v === undefined || isNaN(v)) ? '—' : v;
     const rows = sorted.map((s, i) => {
       const ca1 = getVal(s, 'CA1'), ca2 = getVal(s, 'CA2'), exam = getVal(s, 'Exams');
