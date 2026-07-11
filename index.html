@@ -3851,6 +3851,9 @@ canvas.pa-chart {
         <button class="ad-sb-item" onclick="switchTeacherTab('t-tab-myclasses');setTeacherSbActive(this);teacherResetMyClassesView();">
           <i class="fa-solid fa-chalkboard"></i> 📚 My Classes
         </button>
+        <button class="ad-sb-item" onclick="switchTeacherTab('t-tab-masterlist');setTeacherSbActive(this);renderTeacherMasterListGrid();">
+          <i class="fa-solid fa-list-check"></i> 🗂️ Master List
+        </button>
       </nav>
 
       <div class="ad-sb-bottom">
@@ -4041,6 +4044,22 @@ canvas.pa-chart {
             </div>
           </div>
 
+        </div>
+
+        <!-- ══ TAB: MASTER LIST ══ -->
+        <div id="t-tab-masterlist" class="t-tab-panel">
+          <div class="ad-card">
+            <div class="ad-card-header">
+              <div class="ad-card-title"><i class="fa-solid fa-list-check"></i> Master List</div>
+              <div style="font-size:12px;color:var(--ad-ink3);">Student roster for the class(es) you teach — in original sheet order</div>
+            </div>
+            <div class="ad-card-body">
+              <div class="ad-class-grid" id="teacherMasterListGrid"></div>
+              <div id="teacher-masterlist-loading" class="loading-bar" style="margin-top:12px;">
+                <div class="spinner"></div><span>Generating document…</span>
+              </div>
+            </div>
+          </div>
         </div>
 
       </div>
@@ -5074,7 +5093,10 @@ async function enrichWithTermAverages(students, className) {
 
   // Helper: extract a student's average from a parsed CSV row.
   // Looks for explicit "Average" / "Avg" columns, or computes from subjects.
-  function extractAvg(row) {
+  // `activeSubjects` is the Set of subjects that have at least one score
+  // ANYWHERE in that term's class (computed once per term, see fetchTermMap),
+  // so class-wide-blank subjects are excluded from the divisor.
+  function extractAvg(row, activeSubjects) {
     // 1. Explicit column names
     const explicit = row['Average'] || row['Avg'] || row['Term Average'] ||
                      row['Term_Average'] || row['Total Average'] || '';
@@ -5091,6 +5113,7 @@ async function enrichWithTermAverages(students, className) {
     if (!subjects.length) return null;
     let totalMarks = 0, subjectCount = 0;
     subjects.forEach(sub => {
+      if (activeSubjects && !activeSubjects.has(sub)) return; // class-wide blank subject — skip
       const s1   = parseFloat(row[`${sub}_CA1`])   || 0;
       const s2   = parseFloat(row[`${sub}_CA2`])   || 0;
       const s3   = parseFloat(row[`${sub}_CA3`])   || 0;
@@ -5101,10 +5124,11 @@ async function enrichWithTermAverages(students, className) {
     return subjectCount ? +(totalMarks / subjectCount).toFixed(2) : null;
   }
 
-  // Fetch and parse a term CSV, returning a map keyed by lower-case Admission No
+  // Fetch and parse a term CSV, returning a map keyed by lower-case Admission No,
+  // plus the Set of subjects that are actually in use somewhere in that term.
   async function fetchTermMap(term) {
     const url = getTermUrl(className, term);
-    if (!url) return {};
+    if (!url) return { map: {}, activeSubjects: new Set() };
     try {
       const csv  = await fetchCSV(url);
       const rows = parseCSV(csv);
@@ -5113,18 +5137,20 @@ async function enrichWithTermAverages(students, className) {
         const adm = (row['Admission No'] || '').trim().toLowerCase();
         if (adm) map[adm] = row;
       });
-      return map;
+      return { map, activeSubjects: computeActiveSubjectsFromRows(rows) };
     } catch (e) {
       console.warn(`enrichWithTermAverages: could not fetch ${term} for ${className}`, e);
-      return {};
+      return { map: {}, activeSubjects: new Set() };
     }
   }
 
   // Fetch both earlier terms in parallel
-  const [firstMap, secondMap] = await Promise.all([
+  const [firstTerm, secondTerm] = await Promise.all([
     fetchTermMap('First Term'),
     fetchTermMap('Second Term')
   ]);
+  const firstMap  = firstTerm.map,  firstActiveSubjects  = firstTerm.activeSubjects;
+  const secondMap = secondTerm.map, secondActiveSubjects = secondTerm.activeSubjects;
 
   // Stamp averages onto each Third Term student record
   students.forEach(stu => {
@@ -5134,7 +5160,7 @@ async function enrichWithTermAverages(students, className) {
     // Only overwrite if the column is blank/zero in the Third Term sheet
     const existingAvg1 = parseFloat(stu['First_Term_Avg'] || stu['1st_Term_Avg'] || 0);
     if ((!existingAvg1 || isNaN(existingAvg1)) && firstMap[adm]) {
-      const computed = extractAvg(firstMap[adm]);
+      const computed = extractAvg(firstMap[adm], firstActiveSubjects);
       if (computed !== null) {
         stu['First_Term_Avg'] = computed;
       }
@@ -5143,7 +5169,7 @@ async function enrichWithTermAverages(students, className) {
     // ── Second Term average ──
     const existingAvg2 = parseFloat(stu['Second_Term_Avg'] || stu['2nd_Term_Avg'] || 0);
     if ((!existingAvg2 || isNaN(existingAvg2)) && secondMap[adm]) {
-      const computed = extractAvg(secondMap[adm]);
+      const computed = extractAvg(secondMap[adm], secondActiveSubjects);
       if (computed !== null) {
         stu['Second_Term_Avg'] = computed;
       }
@@ -5151,6 +5177,42 @@ async function enrichWithTermAverages(students, className) {
   });
 }
 /* END — enrichWithTermAverages */
+
+/* ============================================================
+   ACTIVE-SUBJECT HELPER (Average calculation fix)
+   Purpose: A subject should only count toward the AVERAGE
+   denominator if at least one student in the class/term has a
+   real score (CA or Exam) recorded for it. Subjects that are
+   completely blank for every student (e.g. an elective nobody
+   was scored in) are excluded from the divisor so they don't
+   drag averages down. Subjects where at least one student has
+   a score DO count for every student in that group — including
+   students who are individually absent in that subject.
+   ============================================================ */
+
+/* Given an array of raw CSV row objects, return the Set of
+   subject names (as they appear before "_CA1"/"_Exams" etc.)
+   that have at least one non-zero CA/Exam score anywhere in
+   the rows. */
+function computeActiveSubjectsFromRows(rows) {
+  const active = new Set();
+  if (!rows || !rows.length) return active;
+  const headers = Object.keys(rows[0]);
+  const subjects = [...new Set(
+    headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => h.split('_')[0])
+  )];
+  subjects.forEach(sub => {
+    const hasScore = rows.some(row => {
+      const s1   = parseFloat(row[`${sub}_CA1`])   || 0;
+      const s2   = parseFloat(row[`${sub}_CA2`])   || 0;
+      const s3   = parseFloat(row[`${sub}_CA3`])   || 0;
+      const exam = parseFloat(row[`${sub}_Exams`]) || 0;
+      return !!(s1 || s2 || s3 || exam);
+    });
+    if (hasScore) active.add(sub);
+  });
+  return active;
+}
 
 /* ============================================================
    GRADING HELPERS
@@ -5408,6 +5470,18 @@ function renderCards(container, rawStudents, formMasterOverride) {
     return;
   }
 
+  // A subject only counts toward the AVERAGE divisor if at least one
+  // student in this class has a real score for it. Subjects that are
+  // completely blank across every student (e.g. an elective nobody
+  // was scored in) are excluded so they don't drag averages down.
+  const activeSubjects = new Set(subjects.filter(sub => rawStudents.some(stu => {
+    const s1   = getSubjVal(stu, sub, 'CA1');
+    const s2   = getSubjVal(stu, sub, 'CA2');
+    const s3   = getSubjVal(stu, sub, 'CA3');
+    const exam = getSubjVal(stu, sub, 'Exams');
+    return !!(s1 || s2 || s3 || exam);
+  })));
+
   /* 1. Process each student's scores ────────────────────────── */
   const groups = {};
   const processedStudents = rawStudents.map((stu, idx) => {
@@ -5423,7 +5497,9 @@ function renderCards(container, rawStudents, formMasterOverride) {
       const exam = getSubjVal(stu, sub, 'Exams');
       const total = s1 + s2 + s3 + exam;
       const grade = calculateGrade(total);
-      totalMarks += total; subjectCount++;
+      // Only add this subject to the average divisor if it's an
+      // "active" subject for the class (see activeSubjects above).
+      if (activeSubjects.has(sub)) { totalMarks += total; subjectCount++; }
       const isAbsent = s1===0 && s2===0 && s3===0 && exam===0;
       processedSubjects.push({
         no: processedSubjects.length + 1,
@@ -6011,6 +6087,9 @@ function computeAnalytics(records, className) {
   const subjects = [...new Set(
     headers.filter(h => h.includes('_CA') || h.includes('_Exams')).map(h => h.split('_')[0])
   )];
+  // Exclude subjects that are completely blank across every student in
+  // this class from the average divisor (see computeActiveSubjectsFromRows).
+  const activeSubjects = computeActiveSubjectsFromRows(records);
 
   let maleCount = 0, femaleCount = 0;
   let passCount = 0, failCount = 0;
@@ -6026,6 +6105,7 @@ function computeAnalytics(records, className) {
     const mode = getScoringMode(stu['Class Category'] || 'Primary');
     let total = 0, count = 0;
     subjects.forEach(sub => {
+      if (!activeSubjects.has(sub)) return; // class-wide blank subject — skip
       total += (+stu[sub + '_CA1']   || 0) +
                (+stu[sub + '_CA2']   || 0) +
                (mode.isJssSs ? (+stu[sub + '_CA3'] || 0) : 0) +
@@ -6068,7 +6148,7 @@ async function computeStudentAnnualAvg(className) {
   const termKeys = ['First Term', 'Second Term', 'Third Term'];
   const termMaps = await Promise.all(termKeys.map(async term => {
     const url = getTermUrl(className, term);
-    if (!url) return {};
+    if (!url) return { map: {}, activeSubjects: new Set() };
     try {
       const csv = await fetchCSV(url);
       const rows = parseTeachersCSVFlex(csv); // use flexible parser
@@ -6077,10 +6157,11 @@ async function computeStudentAnnualAvg(className) {
         const adm = (row['Admission No'] || '').trim().toLowerCase();
         if (adm) map[adm] = row;
       });
-      return map;
-    } catch { return {}; }
+      return { map, activeSubjects: computeActiveSubjectsFromRows(rows) };
+    } catch { return { map: {}, activeSubjects: new Set() }; }
   }));
-  const [firstMap, secondMap, thirdMap] = termMaps;
+  const [firstTerm, secondTerm, thirdTerm] = termMaps;
+  const firstMap = firstTerm.map, secondMap = secondTerm.map, thirdMap = thirdTerm.map;
 
   // Merge all known students
   const allAdm = new Set([
@@ -6089,7 +6170,9 @@ async function computeStudentAnnualAvg(className) {
     ...Object.keys(thirdMap)
   ]);
 
-  function extractStudentAvg(row) {
+  // `activeSubjects` excludes subjects that are completely blank across
+  // every student in that term's class, so they don't drag the average down.
+  function extractStudentAvg(row, activeSubjects) {
     if (!row) return null;
     const headers = Object.keys(row);
     const subjects = [...new Set(
@@ -6098,6 +6181,7 @@ async function computeStudentAnnualAvg(className) {
     if (!subjects.length) return null;
     let total = 0, count = 0;
     subjects.forEach(sub => {
+      if (activeSubjects && !activeSubjects.has(sub)) return;
       total += (+row[sub+'_CA1']||0)+(+row[sub+'_CA2']||0)+(+row[sub+'_CA3']||0)+(+row[sub+'_Exams']||0);
       count++;
     });
@@ -6110,9 +6194,9 @@ async function computeStudentAnnualAvg(className) {
     const name = (row && row['Name']) ? row['Name'] : '';
     if (!name) return;
     const avgs = [
-      extractStudentAvg(firstMap[adm]),
-      extractStudentAvg(secondMap[adm]),
-      extractStudentAvg(thirdMap[adm])
+      extractStudentAvg(firstMap[adm], firstTerm.activeSubjects),
+      extractStudentAvg(secondMap[adm], secondTerm.activeSubjects),
+      extractStudentAvg(thirdMap[adm], thirdTerm.activeSubjects)
     ].filter(v => v !== null);
     if (!avgs.length) return;
     const annual = +(avgs.reduce((a,b)=>a+b,0)/avgs.length).toFixed(2);
@@ -7779,11 +7863,22 @@ function computeClassRanking(rawStudents) {
     return actualHeader ? (stu[actualHeader] || 0) : 0;
   };
 
+  // Exclude subjects that are completely blank across every student in
+  // this class from the average divisor.
+  const activeSubjects = new Set(subjects.filter(sub => rawStudents.some(stu => {
+    const s1   = getSubjVal(stu, sub, 'CA1');
+    const s2   = getSubjVal(stu, sub, 'CA2');
+    const s3   = getSubjVal(stu, sub, 'CA3');
+    const exam = getSubjVal(stu, sub, 'Exams');
+    return !!(s1 || s2 || s3 || exam);
+  })));
+
   const ranked = rawStudents.map(stu => {
     const category = stu['Class Category'] || 'Primary';
     const mode = getScoringMode(category);
     let totalMarks = 0, subjectCount = 0;
     subjects.forEach(sub => {
+      if (!activeSubjects.has(sub)) return; // class-wide blank subject — skip
       const s1   = getSubjVal(stu, sub, 'CA1');
       const s2   = getSubjVal(stu, sub, 'CA2');
       const s3   = mode.isJssSs ? getSubjVal(stu, sub, 'CA3') : 0;
@@ -7811,9 +7906,8 @@ async function buildMasterListTableHtml(className) {
   const { records, term } = await fetchBestAvailableStudents(className);
   if (!records.length) return null;
 
-  const sorted = [...records].sort((a, b) =>
-    String(a['Name'] || '').localeCompare(String(b['Name'] || ''))
-  );
+  // Keep the sheet's original row order (not alphabetical).
+  const sorted = records;
 
   const rows = sorted.map((s, i) => `
     <tr style="background:${i % 2 === 0 ? '#fff' : '#FBF6EC'};">
@@ -8046,6 +8140,105 @@ async function printPositionListDoc(className) {
     showToast('❌ Could not prepare the print view.', 'error');
   } finally {
     setMasterListLoading(false);
+  }
+}
+/** Teacher Portal — Master List tab. Same roster/PDF logic as the
+    admin Master List, restricted to the class(es) the logged-in
+    teacher actually teaches (from teacherMyClasses). Sheet order
+    is preserved (see buildMasterListTableHtml). */
+function renderTeacherMasterListGrid() {
+  const grid = $('teacherMasterListGrid');
+  if (!grid) return;
+  // Dedupe class-arms in case a teacher is listed against the same
+  // class for more than one subject.
+  const seen = new Set();
+  const classNames = [];
+  teacherMyClasses.forEach(c => {
+    if (!seen.has(c.realClassName)) { seen.add(c.realClassName); classNames.push(c.realClassName); }
+  });
+
+  if (!classNames.length) {
+    grid.innerHTML = '<p class="t-empty-note">No classes assigned yet. Contact the school admin.</p>';
+    return;
+  }
+
+  grid.innerHTML = classNames.map(name => {
+    const meta     = CLASS_META[name] || { icon: '📋', category: 'primary', badge: 'primary' };
+    const safeName = name.replace(/'/g, "\\'");
+    return `
+      <div class="class-card cat-${meta.badge}" style="cursor:default;">
+        <div class="class-card-badge badge-${meta.badge}">${meta.category.toUpperCase()}</div>
+        <div class="class-card-icon">${meta.icon}</div>
+        <div class="class-card-name">${escapeHtml(name)}</div>
+        <div class="class-card-sub">Student Roster</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px;">
+          <button class="btn-report btn-report-outline" style="width:100%;justify-content:center;" onclick="teacherDownloadMasterList('${safeName}')">📥 Download Master List</button>
+          <button class="btn-report btn-report-outline" style="width:100%;justify-content:center;" onclick="teacherPrintMasterListDoc('${safeName}')">🖨️ Print Master List</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function setTeacherMasterListLoading(on) {
+  const loader = $('teacher-masterlist-loading');
+  if (!loader) return;
+  loader.classList.toggle('visible', !!on);
+}
+
+async function teacherDownloadMasterList(className) {
+  setTeacherMasterListLoading(true);
+  showToast(`⏳ Generating Master List for ${className}…`);
+  try {
+    const built = await buildMasterListTableHtml(className);
+    if (!built) {
+      showToast(`❌ No student data found for ${className}.`, 'error');
+      return;
+    }
+    const html = buildLetterPdfHtml(
+      `Master List — ${className}`,
+      `Class: ${className} | Total: ${built.count} student(s) | Session: ${SCHOOL_CONFIG.session}`,
+      built.tableHtml
+    );
+    const el = mountLetterTemplate(html);
+    await html2pdf().set(letterPdfOptions(`Pariya_Primary_MasterList_${className.replace(/\s/g, '_')}.pdf`)).from(el).save();
+    unmountLetterTemplate(el);
+    showToast(`✅ Master List downloaded for ${className}!`);
+  } catch (e) {
+    console.error(e);
+    showToast('❌ Could not generate Master List.', 'error');
+  } finally {
+    setTeacherMasterListLoading(false);
+  }
+}
+
+async function teacherPrintMasterListDoc(className) {
+  setTeacherMasterListLoading(true);
+  showToast(`⏳ Preparing Master List for ${className}…`);
+  try {
+    const built = await buildMasterListTableHtml(className);
+    if (!built) {
+      showToast(`❌ No student data found for ${className}.`, 'error');
+      return;
+    }
+    const html = buildLetterPdfHtml(
+      `Master List — ${className}`,
+      `Class: ${className} | Total: ${built.count} student(s) | Session: ${SCHOOL_CONFIG.session}`,
+      built.tableHtml
+    );
+    const pc = $('printContainer');
+    pc.innerHTML = html;
+    setTimeout(() => {
+      try { window.print(); }
+      catch (err) {
+        console.error('window.print() failed:', err);
+        showToast('❌ Could not open the print dialog.', 'error');
+      }
+    }, 400);
+  } catch (e) {
+    console.error(e);
+    showToast('❌ Could not prepare the print view.', 'error');
+  } finally {
+    setTeacherMasterListLoading(false);
   }
 }
 /* END CUSTOM EDIT SECTION — Master List */
@@ -8508,6 +8701,7 @@ function renderTeacherDashboard() {
   // Reset My Classes drill-down to step 1
   teacherResetMyClassesView();
   renderTeacherClassesGrid();
+  renderTeacherMasterListGrid();
 
   // Default to Dashboard tab + sidebar state
   switchTeacherTab('t-tab-dashboard');
@@ -8626,7 +8820,8 @@ async function teacherLoadSubjectScores(term, btnEl) {
       noteHtml = `<p class="t-empty-note">No "${escapeHtml(teacherActiveSubject)}" scores have been recorded yet for this class's ${escapeHtml(term)} sheet.</p>`;
     }
 
-    const sorted = [...records].sort((a, b) => String(a['Name'] || '').localeCompare(String(b['Name'] || '')));
+    // Keep the sheet's original row order (not alphabetical).
+    const sorted = records;
     const fmt = v => (v === null || v === undefined || isNaN(v)) ? '—' : v;
     const rows = sorted.map((s, i) => {
       const ca1 = getVal(s, 'CA1'), ca2 = getVal(s, 'CA2'), exam = getVal(s, 'Exams');
